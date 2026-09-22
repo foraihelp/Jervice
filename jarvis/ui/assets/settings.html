@@ -1,0 +1,175 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Jarvis Settings</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { font-family: 'Sora', system-ui, sans-serif; color: #E8EEF4; background: #05070b; }
+  .drag { -webkit-app-region: drag; }
+  .no-drag { -webkit-app-region: no-drag; }
+
+  input[type=text], input[type=password], input[type=number] {
+    font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #D7E2EA;
+    background: #0A0F16; border: 1px solid rgba(120,190,255,0.16); padding: 9px 12px;
+    border-radius: 6px; outline: none; width: 100%;
+  }
+  input:focus { border-color: rgba(111,227,255,0.5); }
+  input[type=range] {
+    -webkit-appearance: none; width: 100%; height: 4px; border-radius: 2px;
+    background: rgba(120,190,255,0.14); outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: #EAF6FC; box-shadow: 0 0 10px rgba(111,227,255,0.6); cursor: pointer;
+  }
+  .toggle { width: 38px; height: 22px; border-radius: 12px; position: relative; cursor: pointer; transition: background 0.15s ease; }
+  .toggle.on { background: oklch(78% 0.14 200); box-shadow: 0 0 10px rgba(111,227,255,0.35); }
+  .toggle.off { background: rgba(120,190,255,0.16); }
+  .toggle .knob { position: absolute; top: 2px; width: 18px; height: 18px; border-radius: 50%; background: #04141C; transition: left 0.15s ease; }
+  .toggle.on .knob { left: 18px; background: #04141C; }
+  .toggle.off .knob { left: 2px; background: #7C93A6; }
+
+  #save-btn { cursor: pointer; transition: filter 0.15s ease; }
+  #save-btn:hover { filter: brightness(1.08); }
+  #save-status { font-size: 11px; color: #56677A; text-align: center; margin-top: 8px; height: 14px; }
+</style>
+</head>
+<body>
+
+<div style="width:100%; height:100%; display:flex; flex-direction:column; position:relative;">
+  <div style="position:absolute; inset:0; pointer-events:none; background: radial-gradient(420px 280px at 90% -10%, rgba(79,166,255,0.09), transparent 60%);"></div>
+
+  <div class="drag" style="position:relative; height:52px; min-height:52px; display:flex; align-items:center; justify-content:space-between; padding:0 18px; border-bottom:1px solid rgba(120,190,255,0.12);">
+    <div style="font-size:13px; font-weight:600; letter-spacing:0.14em;">SETTINGS</div>
+    <svg id="close-btn" class="no-drag" width="14" height="14" viewBox="0 0 24 24" fill="none" style="opacity:0.6; cursor:pointer;"><path d="M6 6l12 12M18 6L6 18" stroke="#8CA0B3" stroke-width="1.6" stroke-linecap="round"/></svg>
+  </div>
+
+  <div style="position:relative; flex:1; overflow-y:auto; padding:26px 30px; display:flex; flex-direction:column; gap:26px;">
+
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">WAKE WORD</div>
+      <div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+          <div style="font-size:13px; color:#D7E2EA;">Sensitivity threshold</div>
+          <div id="threshold-value" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6FE3FF;">0.50</div>
+        </div>
+        <input id="threshold" type="range" min="0.1" max="0.9" step="0.05" value="0.5">
+        <div style="display:flex; justify-content:space-between; margin-top:6px; font-family:'JetBrains Mono',monospace; font-size:9.5px; color:#4A5A6A;"><span>MORE SENSITIVE</span><span>FEWER FALSE TRIGGERS</span></div>
+      </div>
+    </div>
+
+    <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
+
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">VOICE</div>
+      <div style="display:flex; gap:24px;">
+        <div style="flex:1;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <div style="font-size:13px; color:#D7E2EA;">Speaking rate</div>
+            <div id="rate-value" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6FE3FF;">185 wpm</div>
+          </div>
+          <input id="rate" type="range" min="120" max="260" step="5" value="185">
+        </div>
+        <div style="flex:1;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <div style="font-size:13px; color:#D7E2EA;">Volume</div>
+            <div id="volume-value" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6FE3FF;">100%</div>
+          </div>
+          <input id="volume" type="range" min="0" max="100" step="5" value="100">
+        </div>
+      </div>
+    </div>
+
+    <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
+
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">REMOTE ACCESS</div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div>
+          <div style="font-size:13px; color:#D7E2EA;">Local API server</div>
+          <div style="font-size:11px; color:#56677A; margin-top:2px;">Lets the iOS app reach this assistant</div>
+        </div>
+        <div id="server-toggle" class="toggle on"><div class="knob"></div></div>
+      </div>
+
+      <div style="display:flex; gap:16px;">
+        <div style="flex:1;">
+          <div style="font-size:11px; color:#56677A; margin-bottom:6px;">PORT</div>
+          <input id="port" type="number" value="8731">
+        </div>
+        <div style="flex:2;">
+          <div style="font-size:11px; color:#56677A; margin-bottom:6px;">API TOKEN</div>
+          <input id="token" type="password" value="">
+        </div>
+      </div>
+      <div style="font-size:11px; color:#4A5A6A; margin-top:10px;">Changing the token here updates .env — restart Jarvis afterward for the local API server to pick it up.</div>
+    </div>
+  </div>
+
+  <div style="position:relative; padding:16px 30px 22px;">
+    <div id="save-btn" style="text-align:center; padding:12px; border-radius:10px; background:oklch(78% 0.14 200); color:#04141C; font-weight:600; font-size:14px; box-shadow:0 0 22px rgba(111,227,255,0.35);">Save</div>
+    <div id="save-status"></div>
+  </div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  function bindRange(id, valueId, format) {
+    $(id).addEventListener('input', () => { $(valueId).textContent = format($(id).value); });
+  }
+  bindRange('threshold', 'threshold-value', v => Number(v).toFixed(2));
+  bindRange('rate', 'rate-value', v => v + ' wpm');
+  bindRange('volume', 'volume-value', v => Math.round(v) + '%');
+
+  let serverEnabled = true;
+  $('server-toggle').addEventListener('click', () => {
+    serverEnabled = !serverEnabled;
+    $('server-toggle').className = 'toggle ' + (serverEnabled ? 'on' : 'off');
+  });
+
+  async function loadSettings() {
+    try {
+      const s = await window.pywebview.api.get_settings();
+      $('threshold').value = s.wake_word_threshold;
+      $('threshold-value').textContent = Number(s.wake_word_threshold).toFixed(2);
+      $('rate').value = s.tts_rate;
+      $('rate-value').textContent = s.tts_rate + ' wpm';
+      $('volume').value = Math.round(s.tts_volume * 100);
+      $('volume-value').textContent = Math.round(s.tts_volume * 100) + '%';
+      $('port').value = s.server_port;
+      $('token').value = s.api_token || '';
+      serverEnabled = !!s.server_enabled;
+      $('server-toggle').className = 'toggle ' + (serverEnabled ? 'on' : 'off');
+    } catch (e) {
+      $('save-status').textContent = 'Could not load settings: ' + e;
+    }
+  }
+
+  $('save-btn').addEventListener('click', async () => {
+    $('save-status').textContent = 'Saving…';
+    try {
+      await window.pywebview.api.save_settings({
+        wake_word_threshold: parseFloat($('threshold').value),
+        tts_rate: parseInt($('rate').value, 10),
+        tts_volume: parseInt($('volume').value, 10) / 100,
+        server_enabled: serverEnabled,
+        server_port: parseInt($('port').value, 10),
+        api_token: $('token').value,
+      });
+      $('save-status').textContent = 'Saved. Restart Jarvis for wake word / server changes to fully apply.';
+    } catch (e) {
+      $('save-status').textContent = 'Error saving: ' + e;
+    }
+  });
+
+  $('close-btn').addEventListener('click', () => { window.pywebview.api.close(); });
+
+  window.addEventListener('pywebviewready', loadSettings);
+</script>
+</body>
+</html>

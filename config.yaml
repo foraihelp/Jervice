@@ -1,0 +1,63 @@
+# Jarvis configuration
+# Restart the app after changing this file.
+
+wake_word:
+  # openWakeWord ships pretrained models including "hey_jarvis".
+  # See jarvis/audio/wake_word.py for how this is loaded.
+  model: "hey_jarvis"
+  threshold: 0.5          # 0.0-1.0, lower = more sensitive (more false triggers)
+
+recording:
+  silence_seconds: 1.2    # how long you must pause before recording stops
+  max_seconds: 20         # hard cap on a single command recording
+  sample_rate: 16000
+  # RMS amplitude a frame must exceed to count as "speech" (plain int16
+  # loudness, roughly 0-32768). Idle mic/room noise is usually ~50-300;
+  # normal speech is usually 1000+. Lower this if Jarvis cuts you off too
+  # early; raise it if it keeps recording through background noise.
+  silence_rms_threshold: 400
+
+stt:
+  # faster-whisper model size: tiny, base, small, medium, large-v3
+  # Bigger = more accurate but slower and more RAM. "small" is a good
+  # balance on a typical laptop CPU.
+  model_size: "small"
+  device: "cpu"            # set to "cuda" if you have an NVIDIA GPU + CUDA installed
+  compute_type: "int8"     # int8 is fast on CPU; use "float16" on GPU
+
+tts:
+  rate: 185                 # words per minute, pyttsx3 default is ~200
+  volume: 1.0
+  # Leave blank to use the system default voice. To list available voices,
+  # run: python -m jarvis.audio.tts --list-voices
+  voice_id: ""
+
+brain:
+  model: "claude-opus-4-5-20251101"
+  max_tokens: 1024
+  # Short system prompt personality. Edit freely.
+  system_prompt: >
+    You are Jarvis, a concise, capable personal assistant running locally on
+    the user's Windows PC. You have tools to open/close applications, manage
+    windows, control system volume, take screenshots, search/open files, and
+    open URLs in the browser. Prefer taking action via tools over describing
+    what the user could do. Keep spoken replies short (1-3 sentences) since
+    they will be read aloud via text-to-speech -- avoid long lists, code
+    blocks, or markdown in your replies.
+
+memory:
+  # Number of most recent conversation turns kept in context.
+  history_turns: 20
+  file: "data/memory.json"
+
+server:
+  # Enables the local HTTP API (jarvis/server.py) so the iOS app (or any
+  # other device on your Tailscale network) can talk to this same assistant.
+  # See README.md "iOS app" section for full setup, including Tailscale.
+  enabled: true
+  host: "0.0.0.0"   # listen on all interfaces so Tailscale/LAN clients can reach it
+  port: 8731
+
+logging:
+  level: "INFO"
+  file: "data/jarvis.log"

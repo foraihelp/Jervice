@@ -1,0 +1,3 @@
+# Only needed if you want to build a standalone .exe (see BUILD_EXE.md).
+# Not required to just run "python main.py".
+pyinstaller>=6.11.0
