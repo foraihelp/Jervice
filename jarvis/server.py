@@ -13,13 +13,17 @@ it. See README.md for setup.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
-from jarvis.brain.claude_client import Brain
-
 logger = logging.getLogger("jarvis.server")
+
+# Either AnthropicBrain or OpenAIBrain (see jarvis/brain/__init__.py) --
+# both are duck-typed to the same `.respond(text) -> str` shape, so no
+# concrete type is imported here.
+Brain = Any
 
 
 class ChatRequest(BaseModel):

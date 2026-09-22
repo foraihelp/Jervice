@@ -33,7 +33,20 @@ tts:
   voice_id: ""
 
 brain:
+  # "anthropic" (Claude) or "openai" (OpenAI itself, or ANY OpenAI-compatible
+  # endpoint -- Groq, Together, OpenRouter, DeepSeek, Azure OpenAI, a local
+  # Ollama/LM Studio server, etc. -- via base_url below). Easiest to change
+  # from the app's own Settings window (gear icon) rather than editing this
+  # file directly -- it keeps model/base_url/API key in sync for you.
+  provider: "anthropic"
+  # For provider "anthropic": an Anthropic model, e.g. "claude-opus-4-5-20251101".
+  # For provider "openai": an OpenAI (or compatible) model, e.g. "gpt-4o".
   model: "claude-opus-4-5-20251101"
+  # Only used when provider is "openai". Leave blank for api.openai.com.
+  # Set to another OpenAI-compatible endpoint's URL to use that instead,
+  # e.g. "https://api.groq.com/openai/v1" or "http://localhost:11434/v1"
+  # for a local Ollama server.
+  base_url: ""
   max_tokens: 1024
   # Short system prompt personality. Edit freely.
   system_prompt: >

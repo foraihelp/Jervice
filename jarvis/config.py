@@ -32,6 +32,7 @@ else:
 class Config:
     raw: dict[str, Any]
     anthropic_api_key: str
+    openai_api_key: str
     api_token: str
 
     @property
@@ -83,6 +84,26 @@ class Config:
         return self.raw["tts"].get("voice_id", "") or ""
 
     @property
+    def brain_provider(self) -> str:
+        """'anthropic' (Claude) or 'openai' (OpenAI, or any OpenAI-compatible
+        endpoint -- see brain_base_url). Defaults to 'anthropic' so existing
+        config.yaml files without this key keep working unchanged."""
+        return (self.raw["brain"].get("provider") or "anthropic").strip().lower()
+
+    @property
+    def brain_base_url(self) -> str:
+        """Only used when brain_provider == 'openai'. Blank means the real
+        OpenAI API; set to another OpenAI-compatible endpoint's URL (Groq,
+        Together, OpenRouter, DeepSeek, Azure OpenAI, a local Ollama/LM
+        Studio server, ...) to use that instead."""
+        return (self.raw["brain"].get("base_url") or "").strip()
+
+    @property
+    def brain_api_key(self) -> str:
+        """The API key for whichever provider is currently selected."""
+        return self.openai_api_key if self.brain_provider == "openai" else self.anthropic_api_key
+
+    @property
     def brain_model(self) -> str:
         return self.raw["brain"]["model"]
 
@@ -124,7 +145,7 @@ class Config:
 
     @property
     def has_api_key(self) -> bool:
-        return bool(self.anthropic_api_key)
+        return bool(self.brain_api_key)
 
 
 _PLACEHOLDER_API_KEY = "sk-ant-your-key-here"
@@ -166,10 +187,14 @@ def load_config() -> Config:
     api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if api_key == _PLACEHOLDER_API_KEY:
         api_key = ""
+    openai_api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     # No API key yet is not fatal: the app still starts, with the main
     # window prompting the user to add one in Settings (see main.py). This
     # is what lets a freshly installed .exe run on a machine that has never
     # been configured, instead of crashing before any window can appear.
+    # Both providers' keys are kept in .env at once (not just the active
+    # one) so switching brain.provider back and forth in Settings doesn't
+    # forget whichever key isn't currently selected.
 
     api_token = os.environ.get("JARVIS_API_TOKEN", "").strip()
     server_enabled = bool(raw.get("server", {}).get("enabled", False))
@@ -185,7 +210,7 @@ def load_config() -> Config:
 
         set_key(str(env_path), "JARVIS_API_TOKEN", api_token)
 
-    return Config(raw=raw, anthropic_api_key=api_key, api_token=api_token)
+    return Config(raw=raw, anthropic_api_key=api_key, openai_api_key=openai_api_key, api_token=api_token)
 
 
 def save_settings(payload: dict[str, Any]) -> None:
@@ -197,7 +222,10 @@ def save_settings(payload: dict[str, Any]) -> None:
     Recognized payload keys (all optional): wake_word_threshold (float),
     tts_rate (int), tts_volume (float 0-1), server_enabled (bool),
     server_port (int), api_token (str, written to .env not config.yaml),
-    anthropic_api_key (str, written to .env not config.yaml).
+    provider ("anthropic" or "openai"), model (str), base_url (str, only
+    meaningful for "openai"), api_key (str, written to .env not
+    config.yaml -- under ANTHROPIC_API_KEY or OPENAI_API_KEY depending on
+    `provider`, so switching providers doesn't overwrite the other one's key).
     """
     from ruamel.yaml import YAML
 
@@ -218,12 +246,19 @@ def save_settings(payload: dict[str, Any]) -> None:
         data.setdefault("server", {})["enabled"] = bool(payload["server_enabled"])
     if "server_port" in payload:
         data.setdefault("server", {})["port"] = int(payload["server_port"])
+    provider = payload.get("provider", "").strip().lower() if payload.get("provider") else ""
+    if provider in ("anthropic", "openai"):
+        data.setdefault("brain", {})["provider"] = provider
+    if payload.get("model"):
+        data.setdefault("brain", {})["model"] = payload["model"].strip()
+    if "base_url" in payload:
+        data.setdefault("brain", {})["base_url"] = (payload["base_url"] or "").strip()
 
     with open(config_path, "w", encoding="utf-8") as f:
         yaml_rt.dump(data, f)
 
     api_token = payload.get("api_token", "").strip() if payload.get("api_token") else ""
-    api_key = payload.get("anthropic_api_key", "").strip() if payload.get("anthropic_api_key") else ""
+    api_key = payload.get("api_key", "").strip() if payload.get("api_key") else ""
     if api_token or api_key:
         from dotenv import set_key
 
@@ -233,4 +268,9 @@ def save_settings(payload: dict[str, Any]) -> None:
         if api_token:
             set_key(str(env_path), "JARVIS_API_TOKEN", api_token)
         if api_key:
-            set_key(str(env_path), "ANTHROPIC_API_KEY", api_key)
+            # Written under whichever provider is selected *after* this
+            # save (falls back to the config file's current provider if the
+            # payload didn't change it), so it lands in the right variable.
+            active_provider = provider or (data.get("brain", {}).get("provider") or "anthropic")
+            env_var = "OPENAI_API_KEY" if active_provider == "openai" else "ANTHROPIC_API_KEY"
+            set_key(str(env_path), env_var, api_key)

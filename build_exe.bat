@@ -19,6 +19,7 @@ pyinstaller ^
   --collect-all pystray ^
   --collect-all PIL ^
   --collect-all webview ^
+  --collect-all openai ^
   --hidden-import pyttsx3.drivers ^
   --hidden-import pyttsx3.drivers.sapi5 ^
   --hidden-import win32timezone ^
@@ -42,9 +43,10 @@ copy /Y .env.example dist\Jarvis\.env.example
 echo.
 echo NOTE: this build does NOT need a .env next to the exe. The app creates
 echo its own .env under %%LOCALAPPDATA%%\Jarvis\.env on first launch, and
-echo prompts for your Claude API key right in its Settings window -- this
-echo also keeps working correctly if Jarvis.exe ends up somewhere
-echo non-writable like Program Files (see installer/README.md).
+echo prompts for your AI provider's API key right in its Settings window
+echo (also lets you switch between Claude, OpenAI, or any OpenAI-compatible
+echo endpoint) -- this also keeps working correctly if Jarvis.exe ends up
+echo somewhere non-writable like Program Files (see installer/README.md).
 
 echo.
 echo Writing run_jarvis.bat wrapper -- keeps the window open if Jarvis.exe

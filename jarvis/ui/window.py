@@ -131,7 +131,14 @@ class SettingsAPI:
             "server_enabled": self.config.server_enabled,
             "server_port": self.config.server_port,
             "api_token": self.config.api_token,
+            "provider": self.config.brain_provider,
+            "model": self.config.brain_model,
+            "base_url": self.config.brain_base_url,
+            # Both are sent (not just the active one) so the Settings window
+            # can show the right already-saved key immediately when the user
+            # switches providers, before saving.
             "anthropic_api_key": self.config.anthropic_api_key,
+            "openai_api_key": self.config.openai_api_key,
         }
 
     def save_settings(self, payload: dict[str, Any]) -> dict[str, Any]:

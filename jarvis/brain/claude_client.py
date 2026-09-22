@@ -18,7 +18,7 @@ logger = logging.getLogger("jarvis.brain")
 MAX_TOOL_ITERATIONS = 6  # safety cap against runaway tool-use loops
 
 
-class Brain:
+class AnthropicBrain:
     def __init__(self, api_key: str, model: str, max_tokens: int, system_prompt: str, memory: Memory):
         self._client = Anthropic(api_key=api_key)
         self.model = model

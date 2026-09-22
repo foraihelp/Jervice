@@ -18,7 +18,7 @@ from jarvis.audio.recorder import record_command
 from jarvis.audio.stt import Transcriber
 from jarvis.audio.tts import Speaker
 from jarvis.audio.wake_word import WakeWordListener
-from jarvis.brain.claude_client import Brain
+from jarvis.brain import create_brain
 from jarvis.brain.memory import Memory
 from jarvis.config import load_config
 from jarvis.server import run_server
@@ -53,14 +53,8 @@ def main() -> None:
     setup_logging(config.log_level, config.log_file)
     logger.info("Starting Jarvis...")
 
-    memory = Memory(config.memory_file, config.history_turns)
-    brain = Brain(
-        api_key=config.anthropic_api_key,
-        model=config.brain_model,
-        max_tokens=config.brain_max_tokens,
-        system_prompt=config.system_prompt,
-        memory=memory,
-    )
+    memory = Memory(config.memory_file, config.history_turns, provider=config.brain_provider)
+    brain = create_brain(config, memory)
     speaker = Speaker(rate=config.tts_rate, volume=config.tts_volume, voice_id=config.tts_voice_id)
     transcriber = Transcriber(
         model_size=config.stt_model_size,
@@ -96,11 +90,12 @@ def main() -> None:
         # window has actually loaded (pushing to it any earlier would be a
         # no-op, since the page's JS isn't running yet).
         def _prompt_for_api_key() -> None:
+            provider_name = "Claude" if config.brain_provider == "anthropic" else "OpenAI (or compatible)"
             push_message(
                 window, "jarvis",
-                "Welcome! Add your Claude API key in Settings (gear icon, "
-                "bottom of the left rail) to get started -- get one free at "
-                "console.anthropic.com.",
+                f"Welcome! Add your {provider_name} API key in Settings (gear "
+                "icon, bottom of the left rail) to get started -- you can "
+                "also switch AI providers there.",
             )
             open_settings_window(config)
 
