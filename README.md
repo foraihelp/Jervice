@@ -101,7 +101,12 @@ voice-triggered tool).
    model the first time it's needed.
 
 4. **Add your API key.**
-   Copy `.env.example` to `.env` and paste your real key in:
+   Easiest: just run `python main.py` (step 6 below) -- on first launch with
+   no key set, Jarvis opens its Settings window automatically and lets you
+   paste your key in there (saved straight to `.env`, no file editing).
+
+   Or do it manually ahead of time: copy `.env.example` to `.env` and paste
+   your real key in:
 
    ```powershell
    copy .env.example .env
@@ -248,6 +253,14 @@ Want to run Jarvis without opening a terminal / activating a venv every
 time (e.g. a double-clickable app, or a Startup shortcut)? See
 `BUILD_EXE.md` for packaging this into `Jarvis.exe` with PyInstaller. Do
 this only after the normal `python main.py` setup above is fully working.
+
+## Building an installer (for sharing with other machines)
+
+Want a single `JarvisSetup.exe` that installs Jarvis on another PC with no
+Python and no manual file editing? See `installer/README.md` -- it packages
+the built `.exe` above with Inno Setup, auto-installs the WebView2 Runtime
+if needed, and adds Start Menu/Desktop shortcuts and an uninstaller. The API
+key is still entered once, in-app, on first launch.
 
 ## iOS app
 

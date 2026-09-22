@@ -114,9 +114,28 @@ class Config:
     def log_file(self) -> Path:
         return PROJECT_ROOT / self.raw["logging"]["file"]
 
+    @property
+    def has_api_key(self) -> bool:
+        return bool(self.anthropic_api_key)
+
+
+_PLACEHOLDER_API_KEY = "sk-ant-your-key-here"
+_PLACEHOLDER_API_TOKEN = "change-me-to-a-long-random-string"
+
+
+def _env_path() -> Path:
+    return PROJECT_ROOT / ".env"
+
 
 def load_config() -> Config:
-    load_dotenv(PROJECT_ROOT / ".env")
+    env_path = _env_path()
+    if not env_path.exists():
+        # First run on a fresh install/machine: create an empty .env instead
+        # of requiring the user to manually copy .env.example before the app
+        # will even start. The API key is filled in from the Settings window
+        # (see save_settings() below) once the app is running.
+        env_path.write_text("", encoding="utf-8")
+    load_dotenv(env_path)
 
     config_path = PROJECT_ROOT / "config.yaml"
     if not config_path.exists():
@@ -129,20 +148,26 @@ def load_config() -> Config:
         raw = yaml.safe_load(f)
 
     api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if not api_key or api_key == "sk-ant-your-key-here":
-        raise RuntimeError(
-            "ANTHROPIC_API_KEY is not set. Copy .env.example to .env and put "
-            "your real key in it. Get one at https://console.anthropic.com/"
-        )
+    if api_key == _PLACEHOLDER_API_KEY:
+        api_key = ""
+    # No API key yet is not fatal: the app still starts, with the main
+    # window prompting the user to add one in Settings (see main.py). This
+    # is what lets a freshly installed .exe run on a machine that has never
+    # been configured, instead of crashing before any window can appear.
 
     api_token = os.environ.get("JARVIS_API_TOKEN", "").strip()
     server_enabled = bool(raw.get("server", {}).get("enabled", False))
-    if server_enabled and (not api_token or api_token == "change-me-to-a-long-random-string"):
-        raise RuntimeError(
-            "server.enabled is true in config.yaml but JARVIS_API_TOKEN is not "
-            "set (or still has its placeholder value) in .env. Generate one "
-            "with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
-        )
+    if server_enabled and (not api_token or api_token == _PLACEHOLDER_API_TOKEN):
+        # Unlike the Claude API key, this token doesn't need to come from the
+        # user -- it's just a shared secret between this PC and the iOS app.
+        # Generate one automatically so a fresh install works out of the box
+        # without requiring any manual .env editing.
+        import secrets
+
+        api_token = secrets.token_urlsafe(32)
+        from dotenv import set_key
+
+        set_key(str(env_path), "JARVIS_API_TOKEN", api_token)
 
     return Config(raw=raw, anthropic_api_key=api_key, api_token=api_token)
 
@@ -155,7 +180,8 @@ def save_settings(payload: dict[str, Any]) -> None:
 
     Recognized payload keys (all optional): wake_word_threshold (float),
     tts_rate (int), tts_volume (float 0-1), server_enabled (bool),
-    server_port (int), api_token (str, written to .env not config.yaml).
+    server_port (int), api_token (str, written to .env not config.yaml),
+    anthropic_api_key (str, written to .env not config.yaml).
     """
     from ruamel.yaml import YAML
 
@@ -181,10 +207,14 @@ def save_settings(payload: dict[str, Any]) -> None:
         yaml_rt.dump(data, f)
 
     api_token = payload.get("api_token", "").strip() if payload.get("api_token") else ""
-    if api_token:
+    api_key = payload.get("anthropic_api_key", "").strip() if payload.get("anthropic_api_key") else ""
+    if api_token or api_key:
         from dotenv import set_key
 
-        env_path = PROJECT_ROOT / ".env"
+        env_path = _env_path()
         if not env_path.exists():
             env_path.write_text("", encoding="utf-8")
-        set_key(str(env_path), "JARVIS_API_TOKEN", api_token)
+        if api_token:
+            set_key(str(env_path), "JARVIS_API_TOKEN", api_token)
+        if api_key:
+            set_key(str(env_path), "ANTHROPIC_API_KEY", api_key)

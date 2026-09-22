@@ -24,7 +24,7 @@ from jarvis.config import load_config
 from jarvis.server import run_server
 from jarvis.tools import registry
 from jarvis.tray import TrayApp
-from jarvis.ui.window import create_main_window, push_message, push_status
+from jarvis.ui.window import create_main_window, open_settings_window, push_message, push_status
 
 logger = logging.getLogger("jarvis.main")
 
@@ -89,6 +89,25 @@ def main() -> None:
 
     window = create_main_window(brain, transcriber, config, tray)
     window_holder["window"] = window
+
+    if not config.has_api_key:
+        # First run on a fresh install/machine: no crash, no manual .env
+        # editing required -- just point the user at Settings once the
+        # window has actually loaded (pushing to it any earlier would be a
+        # no-op, since the page's JS isn't running yet).
+        def _prompt_for_api_key() -> None:
+            push_message(
+                window, "jarvis",
+                "Welcome! Add your Claude API key in Settings (gear icon, "
+                "bottom of the left rail) to get started -- get one free at "
+                "console.anthropic.com.",
+            )
+            open_settings_window(config)
+
+        try:
+            window.events.loaded += _prompt_for_api_key
+        except Exception:
+            logger.debug("Could not attach loaded handler for first-run API key prompt", exc_info=True)
 
     def handle_wake() -> None:
         if tray.muted.is_set():

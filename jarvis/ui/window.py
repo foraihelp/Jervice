@@ -131,6 +131,7 @@ class SettingsAPI:
             "server_enabled": self.config.server_enabled,
             "server_port": self.config.server_port,
             "api_token": self.config.api_token,
+            "anthropic_api_key": self.config.anthropic_api_key,
         }
 
     def save_settings(self, payload: dict[str, Any]) -> dict[str, Any]:

@@ -50,6 +50,15 @@
   <div style="position:relative; flex:1; overflow-y:auto; padding:26px 30px; display:flex; flex-direction:column; gap:26px;">
 
     <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">CLAUDE API</div>
+      <div style="font-size:11px; color:#56677A; margin-bottom:6px;">API KEY</div>
+      <input id="anthropic-key" type="password" placeholder="sk-ant-...">
+      <div id="key-status" style="font-size:11px; margin-top:10px;"></div>
+    </div>
+
+    <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
+
+    <div>
       <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">WAKE WORD</div>
       <div>
         <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
@@ -145,6 +154,12 @@
       $('token').value = s.api_token || '';
       serverEnabled = !!s.server_enabled;
       $('server-toggle').className = 'toggle ' + (serverEnabled ? 'on' : 'off');
+
+      $('anthropic-key').value = s.anthropic_api_key || '';
+      $('key-status').textContent = s.anthropic_api_key
+        ? 'A key is set.'
+        : 'No key set yet — get one free at console.anthropic.com, paste it here, then Save.';
+      $('key-status').style.color = s.anthropic_api_key ? '#56677A' : '#FFB454';
     } catch (e) {
       $('save-status').textContent = 'Could not load settings: ' + e;
     }
@@ -160,8 +175,9 @@
         server_enabled: serverEnabled,
         server_port: parseInt($('port').value, 10),
         api_token: $('token').value,
+        anthropic_api_key: $('anthropic-key').value,
       });
-      $('save-status').textContent = 'Saved. Restart Jarvis for wake word / server changes to fully apply.';
+      $('save-status').textContent = 'Saved. Restart Jarvis for the API key / wake word / server changes to fully apply.';
     } catch (e) {
       $('save-status').textContent = 'Error saving: ' + e;
     }

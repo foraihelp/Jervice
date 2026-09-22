@@ -3,3 +3,13 @@ venv/
 data/
 __pycache__/
 *.pyc
+
+# PyInstaller build output (regenerate with build_exe.bat) and the
+# installer's compiled output (regenerate with installer/jarvis.iss) --
+# both are large, regenerable binaries that don't belong in source control.
+build/
+dist/
+*.spec
+installer/output/
+# Fetched at build time (see installer/README.md) rather than committed.
+installer/MicrosoftEdgeWebview2Setup.exe
