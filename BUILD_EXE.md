@@ -42,8 +42,11 @@ downloaded first, the exe will be missing them.
    expect the output to be **large, likely 500MB-1.5GB**; that's normal
    for a bundled speech/ML app, not a sign something went wrong).
 
-3. When it finishes, your app is in `dist\Jarvis\`. `config.yaml` and
-   `.env` are copied there automatically by the script. Run it with:
+3. When it finishes, your app is in `dist\Jarvis\`. `config.yaml` is copied
+   there automatically by the script, as a template -- the app copies it
+   into `%LOCALAPPDATA%\Jarvis\config.yaml` (a location any user can write
+   to, unlike e.g. Program Files) the first time it runs, and creates its
+   own `.env` there too. Run it with:
 
    ```powershell
    dist\Jarvis\run_jarvis.bat
@@ -67,15 +70,17 @@ downloaded first, the exe will be missing them.
 ## Distributing / moving it
 
 `dist\Jarvis\` is a self-contained folder — copy the *whole folder* (not
-just the .exe) to move it, e.g. to another PC, a USB drive, or a Startup
-shortcut. `config.yaml`, `.env`, and the `data\` folder (created on first
-run) all live alongside `Jarvis.exe` inside that folder, so you can edit
-settings or wipe conversation memory without rebuilding.
+just the .exe) to move it, e.g. to another PC, a USB drive, a Startup
+shortcut, or Program Files via the installer (see `installer/README.md`).
 
-**Do not commit or share `.env`** — it has your real API key and server
-token in it. If you're sending this folder to someone else (or another one
-of your own PCs), send the folder minus `.env`, and have them fill in
-their own from `.env.example`.
+Your actual settings, API key, and conversation memory do **not** live in
+this folder — they live under `%LOCALAPPDATA%\Jarvis\` (config.yaml, .env,
+data\), a location that's always writable by the current user regardless of
+where `Jarvis.exe` itself ends up (including read-only-to-standard-users
+locations like Program Files). That folder is created and filled in
+automatically the first time the app runs, so sending someone this
+`dist\Jarvis\` folder never risks leaking your API key — there's nothing
+personal in it to strip out.
 
 ## Going windowed (hide the console)
 
@@ -90,8 +95,9 @@ switch back temporarily) if you ever need to debug an issue, since
 
 - **Double-clicking Jarvis.exe flashes a black window that immediately
   closes**: this is Windows closing the console the moment the process
-  exits — almost always because it crashed on startup (commonly a missing
-  or invalid `.env`/`config.yaml` next to the exe) and you're seeing it
+  exits — almost always because it crashed on startup (commonly a corrupted
+  `%LOCALAPPDATA%\Jarvis\config.yaml`, or a `config.yaml` template missing
+  next to the exe on a first run that needs it) and you're seeing it
   exit, not launch successfully. Run `dist\Jarvis\run_jarvis.bat` instead
   (see step 3 above) — it keeps the window open afterward so you can
   actually read the error, whether that's a Python traceback or just

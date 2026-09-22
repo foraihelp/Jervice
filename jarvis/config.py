@@ -12,12 +12,20 @@ import yaml
 from dotenv import load_dotenv
 
 if getattr(sys, "frozen", False):
-    # Running as a PyInstaller-built .exe: config.yaml/.env/data/ live next
-    # to the .exe itself (NOT inside the bundled temp/_internal folder),
-    # so they can be edited without rebuilding.
-    PROJECT_ROOT = Path(sys.executable).resolve().parent
+    # Running as a PyInstaller-built .exe. The exe's own folder (INSTALL_DIR)
+    # ships a read-only template config.yaml, but is NOT assumed writable --
+    # an installer (e.g. installer/jarvis.iss) may have placed it under
+    # Program Files, which a normal (non-elevated) run cannot write to.
+    # config.yaml/.env/data/ therefore live under the current user's
+    # per-user AppData instead, which is always writable regardless of
+    # where the app itself was installed. See load_config() below, which
+    # seeds this location's config.yaml from the bundled template on first run.
+    INSTALL_DIR = Path(sys.executable).resolve().parent
+    PROJECT_ROOT = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "Jarvis"
+    PROJECT_ROOT.mkdir(parents=True, exist_ok=True)
 else:
-    PROJECT_ROOT = Path(__file__).resolve().parent.parent
+    INSTALL_DIR = Path(__file__).resolve().parent.parent
+    PROJECT_ROOT = INSTALL_DIR
 
 
 @dataclass
@@ -139,10 +147,18 @@ def load_config() -> Config:
 
     config_path = PROJECT_ROOT / "config.yaml"
     if not config_path.exists():
-        raise FileNotFoundError(
-            f"Missing config.yaml at {config_path}. Copy config.yaml (it ships "
-            "with the project) or restore it from source."
-        )
+        bundled_template = INSTALL_DIR / "config.yaml"
+        if bundled_template != config_path and bundled_template.exists():
+            # Frozen build's first run: seed the per-user writable copy from
+            # the read-only template that shipped next to the .exe.
+            import shutil
+
+            shutil.copy(bundled_template, config_path)
+        else:
+            raise FileNotFoundError(
+                f"Missing config.yaml at {config_path}. Copy config.yaml (it "
+                "ships with the project) or restore it from source."
+            )
 
     with open(config_path, "r", encoding="utf-8") as f:
         raw = yaml.safe_load(f)

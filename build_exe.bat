@@ -33,15 +33,18 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo.
-echo Copying config files next to the built exe...
+echo Copying config.yaml next to the built exe (used as the read-only
+echo template the app copies from into %%LOCALAPPDATA%%\Jarvis\config.yaml
+echo on first run -- see jarvis/config.py)...
 copy /Y config.yaml dist\Jarvis\config.yaml
 copy /Y .env.example dist\Jarvis\.env.example
-if exist .env (
-    copy /Y .env dist\Jarvis\.env
-) else (
-    echo NOTE: no .env found here -- copy dist\Jarvis\.env.example to
-    echo dist\Jarvis\.env and fill in your API key before running Jarvis.exe.
-)
+
+echo.
+echo NOTE: this build does NOT need a .env next to the exe. The app creates
+echo its own .env under %%LOCALAPPDATA%%\Jarvis\.env on first launch, and
+echo prompts for your Claude API key right in its Settings window -- this
+echo also keeps working correctly if Jarvis.exe ends up somewhere
+echo non-writable like Program Files (see installer/README.md).
 
 echo.
 echo Writing run_jarvis.bat wrapper -- keeps the window open if Jarvis.exe
