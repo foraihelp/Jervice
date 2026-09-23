@@ -24,6 +24,24 @@ logger = logging.getLogger("jarvis.recorder")
 FRAME_MS = 30  # size of each analysis chunk
 
 
+def test_microphone() -> None:
+    """Briefly opens (and immediately closes) an input stream purely to
+    confirm the microphone is actually reachable -- used by Settings'
+    "Test Microphone & Speaker" button so the user gets a real yes/no
+    answer from the app itself instead of having to go dig through
+    Windows' Privacy & security settings to guess. Raises MicrophoneError
+    (with the same actionable message record_command() uses) on failure;
+    returns normally on success."""
+    try:
+        stream = sd.InputStream(samplerate=16000, channels=1, dtype="int16", blocksize=1600)
+        stream.start()
+        stream.stop()
+        stream.close()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Microphone test failed: %s", exc)
+        raise MicrophoneError(MIC_HELP_TEXT) from exc
+
+
 def record_command(
     sample_rate: int,
     silence_seconds: float,

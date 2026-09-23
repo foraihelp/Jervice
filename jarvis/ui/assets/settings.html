@@ -85,6 +85,17 @@
     <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
 
     <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">MICROPHONE &amp; SPEAKER</div>
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div style="font-size:11px; color:#4A5A6A; max-width:340px;">Confirms both actually work, right now -- no need to go check Windows' Privacy &amp; security settings yourself.</div>
+        <div id="test-audio-btn" style="flex-shrink:0; text-align:center; padding:9px 16px; border-radius:8px; border:1px solid rgba(120,190,255,0.22); font-size:12px; color:#D7E2EA; cursor:pointer; white-space:nowrap;">Test Mic &amp; Speaker</div>
+      </div>
+      <div id="test-audio-status" style="font-size:11px; margin-top:10px;"></div>
+    </div>
+
+    <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
+
+    <div>
       <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">WAKE WORD</div>
       <div>
         <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
@@ -200,6 +211,24 @@
   $('provider-anthropic').addEventListener('click', () => selectProvider('anthropic'));
   $('provider-openai').addEventListener('click', () => selectProvider('openai'));
   $('api-key').addEventListener('input', refreshKeyStatus);
+
+  $('test-audio-btn').addEventListener('click', async () => {
+    $('test-audio-status').textContent = 'Testing… (you should hear a short phrase spoken back)';
+    $('test-audio-status').style.color = '#56677A';
+    try {
+      const result = await window.pywebview.api.test_audio();
+      if (result.ok) {
+        $('test-audio-status').textContent = '✓ Microphone and speaker both confirmed working.';
+        $('test-audio-status').style.color = '#5AD696';
+      } else {
+        $('test-audio-status').textContent = result.message || 'Test failed.';
+        $('test-audio-status').style.color = '#E36B6B';
+      }
+    } catch (e) {
+      $('test-audio-status').textContent = 'Error running test: ' + e;
+      $('test-audio-status').style.color = '#E36B6B';
+    }
+  });
 
   document.querySelectorAll('.preset-btn').forEach((btn) => {
     btn.addEventListener('click', () => {

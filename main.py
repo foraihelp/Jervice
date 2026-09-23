@@ -49,6 +49,39 @@ def setup_logging(level: str, log_file) -> None:
     )
 
 
+# Arbitrary fixed GUID, not tied to anything else -- just needs to be
+# unique to Jarvis so this doesn't collide with some other app's mutex.
+_SINGLE_INSTANCE_MUTEX_NAME = "Jarvis-SingleInstance-8F1B7C1E-9C2E-4C1A-9B7F-3E5D6A2F1D40"
+
+
+def _acquire_single_instance_lock() -> bool:
+    """Returns True if this is the only running Jarvis instance (and keeps
+    it that way by holding a named mutex handle for the rest of the
+    process's life -- the OS releases it automatically on exit, even a
+    crash, so there's no cleanup to get wrong). Returns False if another
+    instance already holds it.
+
+    This matters because two instances each run their own continuous
+    wake-word listener holding the microphone open, and each try to bind
+    the same local API server port -- a second instance doesn't run
+    alongside the first, it actively breaks it (confirmed in the wild:
+    launching a second instance while one was already running produced
+    "Device unavailable"/"Invalid device" PortAudio errors in BOTH,
+    despite each one's own mic handling being individually correct)."""
+    if os.name != "nt":
+        return True  # only Windows is supported anyway; don't block other platforms on this
+    import win32api
+    import win32event
+    import winerror
+
+    global _single_instance_mutex_handle
+    _single_instance_mutex_handle = win32event.CreateMutex(None, False, _SINGLE_INSTANCE_MUTEX_NAME)
+    return win32api.GetLastError() != winerror.ERROR_ALREADY_EXISTS
+
+
+_single_instance_mutex_handle = None  # kept alive for the process's lifetime; see _acquire_single_instance_lock
+
+
 def main() -> None:
     if os.name != "nt":
         print(
@@ -56,6 +89,19 @@ def main() -> None:
             "TTS, and Windows-specific window/volume control). Some tools "
             "will not work on this OS."
         )
+
+    if not _acquire_single_instance_lock():
+        logger.warning("Another Jarvis instance is already running; exiting.")
+        import ctypes
+
+        ctypes.windll.user32.MessageBoxW(
+            0,
+            "Jarvis is already running. Check your system tray (it may be "
+            "hidden, not closed) instead of launching it again.",
+            "Jarvis",
+            0x40,  # MB_ICONINFORMATION
+        )
+        return
 
     config = load_config()
     setup_logging(config.log_level, config.log_file)
@@ -97,7 +143,7 @@ def main() -> None:
     # the same microphone, and only one of them can have it open at a time.
     wake_word_listener = WakeWordListener(config.wake_word_model, config.wake_word_threshold)
 
-    window = create_main_window(brain_holder, transcriber, config, tray, wake_word_listener)
+    window = create_main_window(brain_holder, transcriber, config, tray, wake_word_listener, speaker)
     window_holder["window"] = window
 
     if not config.has_api_key:
@@ -113,7 +159,7 @@ def main() -> None:
                 "icon, bottom of the left rail) to get started -- you can "
                 "also switch AI providers there.",
             )
-            open_settings_window(config, brain_holder)
+            open_settings_window(config, brain_holder, wake_word_listener=wake_word_listener, speaker=speaker)
 
         try:
             window.events.loaded += _prompt_for_api_key

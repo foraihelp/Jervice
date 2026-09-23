@@ -36,12 +36,13 @@ _settings_window = None  # module-level singleton so "open settings" twice re-fo
 class JarvisAPI:
     """Exposed to main.html as `window.pywebview.api`."""
 
-    def __init__(self, brain_holder, transcriber, config, tray, wake_word_listener=None):
+    def __init__(self, brain_holder, transcriber, config, tray, wake_word_listener=None, speaker=None):
         self.brain_holder = brain_holder
         self.transcriber = transcriber
         self.config = config
         self.tray = tray
         self.wake_word_listener = wake_word_listener
+        self.speaker = speaker
         self.window = None  # set by create_main_window() right after the window exists
 
     def get_state(self) -> dict[str, Any]:
@@ -139,7 +140,7 @@ class JarvisAPI:
             self.window.hide()
 
     def open_settings(self) -> None:
-        open_settings_window(self.config, self.brain_holder)
+        open_settings_window(self.config, self.brain_holder, wake_word_listener=self.wake_word_listener, speaker=self.speaker)
 
     def quit(self) -> None:
         logger.info("Quit requested from main window.")
@@ -155,9 +156,11 @@ class SettingsAPI:
     # immediately instead of needing a full restart.
     _BRAIN_AFFECTING_KEYS = {"provider", "model", "base_url", "api_key"}
 
-    def __init__(self, config, brain_holder):
+    def __init__(self, config, brain_holder, wake_word_listener=None, speaker=None):
         self.config = config
         self.brain_holder = brain_holder
+        self.wake_word_listener = wake_word_listener
+        self.speaker = speaker
         self.window = None  # set by open_settings_window() right after the window exists
 
     def get_settings(self) -> dict[str, Any]:
@@ -198,12 +201,44 @@ class SettingsAPI:
 
         return {"ok": True, "applied_live": applied_live}
 
+    def test_audio(self) -> dict[str, Any]:
+        """Confirms the mic and speaker actually work, right now, from
+        inside the app -- so a "yes it works" here is something the user
+        can trust once, instead of needing to separately go check Windows'
+        Privacy & security -> Microphone settings themselves."""
+        from jarvis.audio.errors import MicrophoneError
+        from jarvis.audio.recorder import test_microphone
+
+        # Borrow the mic from the wake-word listener the same way an
+        # actual command recording does -- see WakeWordListener's
+        # docstring for why both can't be open at once.
+        if self.wake_word_listener is not None:
+            self.wake_word_listener.pause()
+        try:
+            test_microphone()
+        except MicrophoneError as exc:
+            return {"ok": False, "message": str(exc)}
+        finally:
+            if self.wake_word_listener is not None:
+                self.wake_word_listener.resume()
+
+        if self.speaker is not None:
+            try:
+                self.speaker.say("Microphone and speaker are both working.")
+            except Exception as exc:  # noqa: BLE001 - TTS failure is not the mic's fault
+                return {
+                    "ok": False,
+                    "message": f"Microphone is fine, but text-to-speech failed: {exc}",
+                }
+
+        return {"ok": True}
+
     def close(self) -> None:
         if self.window is not None:
             self.window.destroy()
 
 
-def create_main_window(brain_holder, transcriber, config, tray, wake_word_listener=None):
+def create_main_window(brain_holder, transcriber, config, tray, wake_word_listener=None, speaker=None):
     """Creates and returns the main pywebview window. Must be called
     before webview.start()."""
     import webview
@@ -214,6 +249,7 @@ def create_main_window(brain_holder, transcriber, config, tray, wake_word_listen
         config=config,
         tray=tray,
         wake_word_listener=wake_word_listener,
+        speaker=speaker,
     )
     window = webview.create_window(
         "Jarvis",
@@ -243,7 +279,7 @@ def create_main_window(brain_holder, transcriber, config, tray, wake_word_listen
     return window
 
 
-def open_settings_window(config, brain_holder) -> None:
+def open_settings_window(config, brain_holder, wake_word_listener=None, speaker=None) -> None:
     """Opens the settings window, or re-focuses it if already open."""
     global _settings_window
 
@@ -257,7 +293,7 @@ def open_settings_window(config, brain_holder) -> None:
 
     import webview
 
-    api = SettingsAPI(config, brain_holder)
+    api = SettingsAPI(config, brain_holder, wake_word_listener=wake_word_listener, speaker=speaker)
     window = webview.create_window(
         "Jarvis Settings",
         str(ASSETS_DIR / "settings.html"),

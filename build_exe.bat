@@ -23,6 +23,8 @@ pyinstaller ^
   --hidden-import pyttsx3.drivers ^
   --hidden-import pyttsx3.drivers.sapi5 ^
   --hidden-import win32timezone ^
+  --hidden-import win32event ^
+  --hidden-import winerror ^
   --add-data "jarvis\ui\assets;jarvis\ui\assets" ^
   main.py
 
