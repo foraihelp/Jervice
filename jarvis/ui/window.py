@@ -44,6 +44,7 @@ class JarvisAPI:
         self.window = None  # set by create_main_window() right after the window exists
 
     def get_state(self) -> dict[str, Any]:
+        from jarvis import __version__
         from jarvis.tools import registry
 
         connections = ["This PC"]
@@ -58,7 +59,23 @@ class JarvisAPI:
             "connections": connections,
             "recent_tools": registry.get_recent_calls(6),
             "muted": self.tray.muted.is_set() if self.tray else False,
+            "version": __version__,
         }
+
+    def check_for_updates(self) -> None:
+        from jarvis.updater import check_for_updates
+
+        check_for_updates(lambda status: push_update_status(self.window, status))
+
+    def get_update_status(self) -> dict[str, Any]:
+        from jarvis.updater import get_latest_status
+
+        return get_latest_status()
+
+    def install_update(self) -> None:
+        from jarvis.updater import install_and_restart
+
+        install_and_restart()
 
     def send_command(self, text: str) -> dict[str, Any]:
         from jarvis.tools import registry
@@ -270,3 +287,15 @@ def push_status(window, **fields: Any) -> None:
         window.evaluate_js(f"setStatus({json.dumps(fields)})")
     except Exception:
         logger.debug("push_status failed (window not ready?)", exc_info=True)
+
+
+def push_update_status(window, status: dict[str, Any]) -> None:
+    """Pushes an update-checker status (see jarvis/updater.py) to the main
+    window's update pill. Safe to call from the updater's background
+    thread, same as push_message/push_status above."""
+    if window is None:
+        return
+    try:
+        window.evaluate_js(f"setUpdateStatus({json.dumps(status)})")
+    except Exception:
+        logger.debug("push_update_status failed (window not ready?)", exc_info=True)

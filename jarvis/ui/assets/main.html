@@ -29,6 +29,12 @@
   .icon-btn { opacity: 0.55; cursor: pointer; transition: opacity 0.15s ease; }
   .icon-btn:hover { opacity: 1; }
 
+  #update-pill:hover { filter: brightness(1.15); }
+  #update-pill.accent { border-color: rgba(111,227,255,0.4); color: #6FE3FF; background: rgba(111,227,255,0.1); }
+  #update-pill.success { border-color: rgba(90,214,150,0.4); color: #5AD696; background: rgba(90,214,150,0.1); }
+  #update-pill.error { border-color: rgba(227,107,107,0.4); color: #E36B6B; background: rgba(227,107,107,0.1); }
+  .update-spinner { width: 9px; height: 9px; border-radius: 50%; border: 1.6px solid currentColor; border-top-color: transparent; animation: jv-spin-slow 0.7s linear infinite; flex-shrink: 0; display: inline-block; }
+
   #command-input {
     background: transparent; border: none; outline: none; color: #EAF6FC;
     font-family: 'Sora', sans-serif; font-size: 13px; width: 100%;
@@ -51,12 +57,14 @@
         <circle cx="12" cy="12" r="2" fill="oklch(78% 0.14 200)"/>
       </svg>
       <div style="font-size:13px; font-weight:600; letter-spacing:0.14em;">JARVIS</div>
-      <div style="display:flex; align-items:center; gap:6px; margin-left:10px; padding:4px 10px; border:1px solid rgba(120,190,255,0.22); border-radius:20px;">
+      <div id="app-version" style="font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600; letter-spacing:0.02em; color:#8CA0B3; background:rgba(120,190,255,0.08); border:1px solid rgba(120,190,255,0.18); border-radius:999px; padding:2px 9px;"></div>
+      <div style="display:flex; align-items:center; gap:6px; margin-left:2px; padding:4px 10px; border:1px solid rgba(120,190,255,0.22); border-radius:20px;">
         <div id="online-dot" style="width:6px; height:6px; border-radius:50%; background:oklch(78% 0.14 200); box-shadow:0 0 8px oklch(78% 0.14 200); animation:jv-pulse 2.4s ease-in-out infinite;"></div>
         <div id="online-label" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.08em; color:#8CA0B3;">ONLINE &middot; LOCAL</div>
       </div>
     </div>
     <div class="no-drag" style="display:flex; align-items:center; gap:16px;">
+      <div id="update-pill" class="no-drag" style="display:none; align-items:center; gap:7px; padding:5px 12px; border-radius:999px; font-size:11.5px; font-weight:500; background:rgba(120,190,255,0.08); border:1px solid rgba(120,190,255,0.18); color:#8CA0B3; white-space:nowrap; cursor:pointer;"></div>
       <svg id="minimize-btn" class="icon-btn" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14" stroke="#8CA0B3" stroke-width="1.6" stroke-linecap="round"/></svg>
       <svg id="hide-btn" class="icon-btn" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#8CA0B3" stroke-width="1.6" stroke-linecap="round"/></svg>
     </div>
@@ -250,9 +258,59 @@
       setConnections(state.connections || []);
       setTools(state.recent_tools || []);
       setMuted(!!state.muted);
+      document.getElementById('app-version').textContent = state.version ? 'v' + state.version : '';
     } catch (e) {
       appendMessage('system', 'Could not load initial state: ' + e);
     }
+
+    try {
+      setUpdateStatus(await window.pywebview.api.get_update_status());
+    } catch (e) {
+      // Non-fatal -- the update pill just stays hidden.
+    }
+  }
+
+  function setUpdateStatus(status) {
+    const pill = document.getElementById('update-pill');
+    status = status || { state: 'idle' };
+    pill.className = 'no-drag';
+    pill.onclick = null;
+
+    switch (status.state) {
+      case 'unsupported':
+        pill.style.display = 'none';
+        return;
+      case 'idle':
+      case 'not-available':
+        pill.innerHTML = status.state === 'not-available' ? "You're up to date" : 'Check for Updates';
+        pill.onclick = () => window.pywebview.api.check_for_updates();
+        break;
+      case 'checking':
+        pill.innerHTML = '<span class="update-spinner"></span> Checking for updates&hellip;';
+        break;
+      case 'available':
+        pill.innerHTML = `<span class="update-spinner"></span> Update ${status.version} found&hellip;`;
+        break;
+      case 'downloading':
+        pill.className = 'no-drag accent';
+        pill.innerHTML = `<span class="update-spinner"></span> Downloading update&hellip; ${Math.round(status.percent || 0)}%`;
+        break;
+      case 'downloaded':
+        pill.className = 'no-drag success';
+        pill.innerHTML = `Update ${status.version} ready &mdash; Restart &amp; Install`;
+        pill.onclick = () => window.pywebview.api.install_update();
+        break;
+      case 'error':
+        pill.className = 'no-drag error';
+        pill.innerHTML = 'Update check failed &mdash; Retry';
+        pill.title = status.message || '';
+        pill.onclick = () => window.pywebview.api.check_for_updates();
+        break;
+      default:
+        pill.style.display = 'none';
+        return;
+    }
+    pill.style.display = 'inline-flex';
   }
 
   async function sendCommand(text) {

@@ -24,7 +24,13 @@ from jarvis.config import load_config
 from jarvis.server import run_server
 from jarvis.tools import registry
 from jarvis.tray import TrayApp
-from jarvis.ui.window import create_main_window, open_settings_window, push_message, push_status
+from jarvis.ui.window import (
+    create_main_window,
+    open_settings_window,
+    push_message,
+    push_status,
+    push_update_status,
+)
 
 logger = logging.getLogger("jarvis.main")
 
@@ -105,6 +111,16 @@ def main() -> None:
             window.events.loaded += _prompt_for_api_key
         except Exception:
             logger.debug("Could not attach loaded handler for first-run API key prompt", exc_info=True)
+
+    # Silent check shortly after launch, same delay as the Video Converter
+    # app's electron-updater setup -- failures just leave the update pill
+    # showing "Check for Updates" rather than being surfaced as errors.
+    def _auto_check_for_updates() -> None:
+        from jarvis.updater import check_for_updates
+
+        check_for_updates(lambda status: push_update_status(window, status))
+
+    threading.Timer(3.0, _auto_check_for_updates).start()
 
     def handle_wake() -> None:
         if tray.muted.is_set():

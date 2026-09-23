@@ -62,7 +62,15 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyLauncherName}"; Working
 
 [Run]
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Installing Microsoft Edge WebView2 Runtime (required for the Jarvis window)..."; Check: NeedsWebView2; Flags: waituntilterminated
-Filename: "{app}\{#MyLauncherName}"; Description: "Launch {#MyAppName} now"; Flags: nowait postinstall skipifsilent runasoriginaluser
+; No skipifsilent: this also fires for a silent self-update (see
+; jarvis/updater.py's install_and_restart(), which runs this installer with
+; /VERYSILENT then quits), so "Update ready -- Restart & Install" actually
+; restarts Jarvis automatically instead of leaving it closed. Launches
+; Jarvis.exe directly rather than run_jarvis.bat (whose trailing "press any
+; key" prompt only makes sense for an interactive first run, not an
+; unattended relaunch) -- see BUILD_EXE.md for why run_jarvis.bat is still
+; what a manual first run should use instead.
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName} now"; Flags: nowait postinstall runasoriginaluser
 
 [Code]
 // Detects the WebView2 Runtime the same way Microsoft's own docs recommend:
