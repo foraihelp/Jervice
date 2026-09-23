@@ -172,7 +172,7 @@ class SettingsAPI:
     # (and its memory, since Anthropic/OpenAI message formats aren't
     # cross-compatible -- see Memory's provider tag) to take effect
     # immediately instead of needing a full restart.
-    _BRAIN_AFFECTING_KEYS = {"provider", "model", "base_url", "api_key"}
+    _BRAIN_AFFECTING_KEYS = {"provider", "model", "base_url", "api_key", "reply_language"}
 
     def __init__(self, config, brain_holder, wake_word_listener=None, speaker=None):
         self.config = config
@@ -187,6 +187,7 @@ class SettingsAPI:
             "tts_rate": self.config.tts_rate,
             "tts_volume": self.config.tts_volume,
             "tts_output_device": self.config.tts_output_device,
+            "reply_language": self.config.reply_language,
             "server_enabled": self.config.server_enabled,
             "server_port": self.config.server_port,
             "api_token": self.config.api_token,
@@ -210,6 +211,19 @@ class SettingsAPI:
         except Exception:
             logger.exception("Could not enumerate audio output devices")
             return []
+
+    def check_voice_for_language(self, language: str) -> bool:
+        """Whether this PC has an installed TTS voice that can actually
+        speak `language` -- lets Settings warn the user up front (Windows
+        doesn't ship Hindi/Bengali voices by default) instead of them
+        saving the setting and then wondering why speech sounds wrong."""
+        from jarvis.audio.tts import Speaker
+
+        try:
+            return Speaker.has_voice_for_language(language)
+        except Exception:
+            logger.exception("Could not check voice availability for %r", language)
+            return True  # fail open -- don't block saving over a check that itself broke
 
     def save_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
         from jarvis.config import load_config, save_settings

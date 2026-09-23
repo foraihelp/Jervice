@@ -122,6 +122,30 @@ class Config:
         return self.raw["brain"]["system_prompt"].strip()
 
     @property
+    def reply_language(self) -> str:
+        """"" (reply in whatever language the user spoke/typed in -- the
+        default), or "english" / "hindi" / "bengali" to always reply in
+        that language regardless of input language."""
+        return (self.raw["brain"].get("reply_language", "") or "").strip().lower()
+
+    @property
+    def effective_system_prompt(self) -> str:
+        """system_prompt, with a language instruction appended when
+        reply_language pins a specific output language. This is the
+        "translation" mechanism -- the model is simply asked to answer
+        directly in that language, rather than answering in English and
+        running a separate translation pass, which would double the
+        latency and add a second point of failure for no real benefit."""
+        prompt = self.system_prompt
+        if self.reply_language:
+            prompt += (
+                f"\n\nAlways reply in {self.reply_language.capitalize()}, regardless of what "
+                "language the user speaks or types in. Do not mix languages or add an English "
+                "translation alongside it -- reply only in that language."
+            )
+        return prompt
+
+    @property
     def history_turns(self) -> int:
         return int(self.raw["memory"]["history_turns"])
 
@@ -228,6 +252,7 @@ def save_settings(payload: dict[str, Any]) -> None:
     Recognized payload keys (all optional): wake_word_threshold (float),
     tts_rate (int), tts_volume (float 0-1), tts_output_device (str,
     substring of a SAPI5 device name, blank = system default),
+    reply_language (str, "" / "english" / "hindi" / "bengali"),
     server_enabled (bool),
     server_port (int), api_token (str, written to .env not config.yaml),
     provider ("anthropic" or "openai"), model (str), base_url (str, only
@@ -252,6 +277,8 @@ def save_settings(payload: dict[str, Any]) -> None:
         data["tts"]["volume"] = float(payload["tts_volume"])
     if "tts_output_device" in payload:
         data["tts"]["output_device"] = (payload["tts_output_device"] or "").strip()
+    if "reply_language" in payload:
+        data.setdefault("brain", {})["reply_language"] = (payload["reply_language"] or "").strip().lower()
     if "server_enabled" in payload:
         data.setdefault("server", {})["enabled"] = bool(payload["server_enabled"])
     if "server_port" in payload:

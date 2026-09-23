@@ -13,6 +13,13 @@ import threading
 
 logger = logging.getLogger("jarvis.tts")
 
+# Maps a reply_language config value to the locale prefix pyttsx3 reports in
+# a SAPI5 voice's `.languages` (e.g. "hi-IN" for a Hindi voice) -- used to
+# auto-pick an installed voice that can actually pronounce that language.
+# An English SAPI5 voice reading Hindi/Bengali script produces garbage, not
+# a graceful approximation, so this match is required, not cosmetic.
+LANGUAGE_LOCALE_PREFIXES = {"english": "en", "hindi": "hi", "bengali": "bn"}
+
 
 class Speaker:
     """Runs pyttsx3 (backed by SAPI5, a COM object) on one dedicated
@@ -35,10 +42,15 @@ class Speaker:
     one thread that created it, regardless of which thread calls say().
     """
 
-    def __init__(self, rate: int, volume: float, voice_id: str = "", output_device: str = ""):
+    def __init__(self, rate: int, volume: float, voice_id: str = "", output_device: str = "", language: str = ""):
         self._rate = rate
         self._volume = volume
         self._voice_id = voice_id
+        # "english" / "hindi" / "bengali", or "" for whatever voice_id/the
+        # system default already is. When set (and voice_id isn't also
+        # explicitly set), overrides voice_id with an installed voice
+        # matching this language -- see _auto_select_voice_for_language.
+        self._language = (language or "").strip().lower()
         # Substring match (case-insensitive) against a SAPI5 audio output
         # device name, e.g. "Realtek" or "BenQ". Empty = leave it on
         # whatever Windows' system-wide default output is. Pinning this
@@ -64,6 +76,8 @@ class Speaker:
         engine.setProperty("volume", self._volume)
         if self._voice_id:
             engine.setProperty("voice", self._voice_id)
+        elif self._language:
+            self._auto_select_voice_for_language(engine, self._language)
         if self._output_device:
             self._pin_output_device(engine, self._output_device)
         self._engine = engine
@@ -79,6 +93,60 @@ class Speaker:
                 logger.exception("TTS engine error")
             finally:
                 self._queue.task_done()
+
+    def _auto_select_voice_for_language(self, engine, language: str) -> None:
+        """Picks an installed SAPI5 voice that can actually speak
+        `language` (matched by locale prefix, e.g. "hi" for Hindi; falls
+        back to a name substring match since not every driver populates
+        `.languages` reliably) and sets it on `engine`. If nothing matches,
+        logs a clear warning and leaves the current (likely English) voice
+        in place rather than silently mispronouncing the reply -- Windows
+        doesn't ship Hindi/Bengali voices by default, so this is a real,
+        expected case, not just a defensive fallback."""
+        prefix = LANGUAGE_LOCALE_PREFIXES.get(language)
+        voice_id = self._match_voice(engine.getProperty("voices"), language, prefix)
+        if voice_id:
+            engine.setProperty("voice", voice_id)
+            logger.info("TTS voice auto-selected for language %r: %s", language, voice_id)
+        else:
+            logger.warning(
+                "No installed voice found for language %r -- speech will use the current "
+                "default voice, which likely can't pronounce it correctly. Install a matching "
+                "voice via Windows Settings -> Time & Language -> Speech.",
+                language,
+            )
+
+    @staticmethod
+    def _match_voice(voices, language: str, prefix: str | None) -> str | None:
+        for v in voices:
+            langs = [str(l).lower() for l in (getattr(v, "languages", None) or [])]
+            if prefix and any(l == prefix or l.startswith(prefix + "-") for l in langs):
+                return v.id
+        for v in voices:
+            if language in (v.name or "").lower():
+                return v.id
+        return None
+
+    @staticmethod
+    def has_voice_for_language(language: str) -> bool:
+        """Whether an installed SAPI5 voice matches `language` ("english" /
+        "hindi" / "bengali") -- used by the Settings window to warn the
+        user up front instead of them finding out by getting silence or
+        garbled speech after saving."""
+        import pyttsx3
+
+        language = (language or "").strip().lower()
+        if not language:
+            return True
+        engine = pyttsx3.init()
+        try:
+            prefix = LANGUAGE_LOCALE_PREFIXES.get(language)
+            return Speaker._match_voice(engine.getProperty("voices"), language, prefix) is not None
+        finally:
+            try:
+                engine.stop()
+            except Exception:
+                pass
 
     def _pin_output_device(self, engine, name_substring: str) -> None:
         """Sets SAPI5's per-voice AudioOutput property so this engine's

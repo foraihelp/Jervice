@@ -139,6 +139,7 @@ def main() -> None:
         volume=config.tts_volume,
         voice_id=config.tts_voice_id,
         output_device=config.tts_output_device,
+        language=config.reply_language,
     )
     transcriber = Transcriber(
         model_size=config.stt_model_size,

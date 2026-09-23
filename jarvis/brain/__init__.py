@@ -39,7 +39,7 @@ def create_brain(config: Any, memory: Memory):
             api_key=config.brain_api_key,
             model=config.brain_model,
             max_tokens=config.brain_max_tokens,
-            system_prompt=config.system_prompt,
+            system_prompt=config.effective_system_prompt,
             memory=memory,
             base_url=config.brain_base_url,
         )
@@ -50,6 +50,6 @@ def create_brain(config: Any, memory: Memory):
         api_key=config.brain_api_key,
         model=config.brain_model,
         max_tokens=config.brain_max_tokens,
-        system_prompt=config.system_prompt,
+        system_prompt=config.effective_system_prompt,
         memory=memory,
     )

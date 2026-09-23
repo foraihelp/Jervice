@@ -132,6 +132,16 @@
         <select id="output-device"><option value="">System default</option></select>
         <div style="font-size:11px; color:#4A5A6A; margin-top:6px;">Pin Jarvis's own speech to this device, regardless of what Windows currently calls the default -- fixes speech silently going nowhere when a paired Bluetooth headset stays "default" while turned off. Requires a restart to apply.</div>
       </div>
+      <div style="margin-top:18px;">
+        <div style="font-size:11px; color:#56677A; margin-bottom:6px;">OUTPUT LANGUAGE</div>
+        <select id="reply-language">
+          <option value="">Same as input (default)</option>
+          <option value="english">English</option>
+          <option value="hindi">Hindi</option>
+          <option value="bengali">Bengali</option>
+        </select>
+        <div id="language-status" style="font-size:11px; margin-top:6px;">Jarvis answers directly in the chosen language -- no separate translation step. The reply text applies immediately; a matching voice for speech needs a restart, and only if one is installed on this PC.</div>
+      </div>
     </div>
 
     <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
@@ -243,6 +253,31 @@
     }
   });
 
+  async function refreshLanguageStatus() {
+    const lang = $('reply-language').value;
+    if (!lang) {
+      $('language-status').textContent = 'Jarvis answers in whatever language you speak or type in.';
+      $('language-status').style.color = '#4A5A6A';
+      return;
+    }
+    $('language-status').textContent = 'Checking for an installed voice…';
+    $('language-status').style.color = '#4A5A6A';
+    try {
+      const ok = await window.pywebview.api.check_voice_for_language(lang);
+      if (ok) {
+        $('language-status').textContent = 'Replies will be answered and spoken in ' + $('reply-language').selectedOptions[0].textContent + '.';
+        $('language-status').style.color = '#56677A';
+      } else {
+        $('language-status').textContent = `No ${$('reply-language').selectedOptions[0].textContent} voice is installed on this PC -- replies will still be translated, but spoken in whatever voice is set above (it likely won't pronounce it correctly). Install one via Windows Settings -> Time & Language -> Speech, or add a matching language pack, then restart Jarvis.`;
+        $('language-status').style.color = '#FFB454';
+      }
+    } catch (e) {
+      $('language-status').textContent = 'Could not check voice availability: ' + e;
+      $('language-status').style.color = '#E36B6B';
+    }
+  }
+  $('reply-language').addEventListener('change', refreshLanguageStatus);
+
   document.querySelectorAll('.preset-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       $('base-url').value = btn.dataset.url;
@@ -287,6 +322,8 @@
       $('volume').value = Math.round(s.tts_volume * 100);
       $('volume-value').textContent = Math.round(s.tts_volume * 100) + '%';
       loadOutputDevices(s.tts_output_device || '');
+      $('reply-language').value = s.reply_language || '';
+      refreshLanguageStatus();
       $('port').value = s.server_port;
       $('token').value = s.api_token || '';
       serverEnabled = !!s.server_enabled;
@@ -311,6 +348,7 @@
         tts_rate: parseInt($('rate').value, 10),
         tts_volume: parseInt($('volume').value, 10) / 100,
         tts_output_device: $('output-device').value,
+        reply_language: $('reply-language').value,
         server_enabled: serverEnabled,
         server_port: parseInt($('port').value, 10),
         api_token: $('token').value,
@@ -320,7 +358,7 @@
         api_key: $('api-key').value,
       });
       $('save-status').textContent = result && result.applied_live
-        ? 'Saved. AI provider change is live now -- try a command. (Wake word / voice / remote-server changes still need a restart.)'
+        ? 'Saved. AI provider / output language change is live now -- try a command. (Voice/output-device selection, wake word, and remote-server changes still need a restart.)'
         : 'Saved. Restart Jarvis for wake word / voice / remote-server changes to fully apply.';
     } catch (e) {
       $('save-status').textContent = 'Error saving: ' + e;

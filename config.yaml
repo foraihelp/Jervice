@@ -56,6 +56,14 @@ brain:
   # for a local Ollama server.
   base_url: ""
   max_tokens: 1024
+  # "" = reply in whatever language the user spoke/typed in (default).
+  # "english" / "hindi" / "bengali" = always reply in that language,
+  # regardless of input language -- the model translates as part of
+  # answering, no separate translation step. Easiest to set from Settings
+  # (gear icon), which also warns if this PC has no installed voice that
+  # can actually speak the chosen language (see tts.output_device above --
+  # Windows doesn't ship Hindi/Bengali voices by default).
+  reply_language: ""
   # Short system prompt personality. Edit freely.
   system_prompt: >
     You are Jarvis, a concise, capable personal assistant running locally on
