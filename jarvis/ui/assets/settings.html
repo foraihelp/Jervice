@@ -38,6 +38,7 @@
 
   .provider-option { color: #8CA0B3; transition: all 0.15s ease; }
   .provider-option.selected { border-color: rgba(111,227,255,0.6) !important; color: #EAF6FC; background: rgba(111,227,255,0.08); box-shadow: 0 0 14px rgba(111,227,255,0.15); }
+  .preset-btn:hover { border-color: rgba(111,227,255,0.5) !important; color: #EAF6FC !important; }
 </style>
 </head>
 <body>
@@ -66,7 +67,14 @@
       <div id="base-url-row" style="margin-top:14px; display:none;">
         <div style="font-size:11px; color:#56677A; margin-bottom:6px;">BASE URL (optional)</div>
         <input id="base-url" type="text" placeholder="Leave blank for api.openai.com">
-        <div style="font-size:11px; color:#4A5A6A; margin-top:6px;">Set this to use any OpenAI-compatible endpoint instead -- Groq, Together, OpenRouter, DeepSeek, Azure OpenAI, a local Ollama/LM Studio server, etc.</div>
+        <div style="font-size:11px; color:#4A5A6A; margin-top:6px; margin-bottom:10px;">Set this to use any OpenAI-compatible endpoint instead. Quick fill (still update the Model field and API key to match):</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <div class="preset-btn" data-url="" data-model="gpt-4o" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">OpenAI</div>
+          <div class="preset-btn" data-url="https://api.groq.com/openai/v1" data-model="llama-3.3-70b-versatile" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">Groq</div>
+          <div class="preset-btn" data-url="https://api.together.xyz/v1" data-model="meta-llama/Llama-3.3-70B-Instruct-Turbo" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">Together</div>
+          <div class="preset-btn" data-url="https://openrouter.ai/api/v1" data-model="openai/gpt-4o" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">OpenRouter</div>
+          <div class="preset-btn" data-url="http://localhost:11434/v1" data-model="llama3.3" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">Local Ollama</div>
+        </div>
       </div>
 
       <div style="font-size:11px; color:#56677A; margin-bottom:6px; margin-top:14px;">API KEY</div>
@@ -193,6 +201,14 @@
   $('provider-openai').addEventListener('click', () => selectProvider('openai'));
   $('api-key').addEventListener('input', refreshKeyStatus);
 
+  document.querySelectorAll('.preset-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      $('base-url').value = btn.dataset.url;
+      $('model').value = btn.dataset.model;
+      $('save-status').textContent = `Filled in ${btn.textContent}'s endpoint and an example model -- double-check the API key above is from ${btn.textContent}, then Save.`;
+    });
+  });
+
   async function loadSettings() {
     try {
       const s = await window.pywebview.api.get_settings();
@@ -221,7 +237,7 @@
   $('save-btn').addEventListener('click', async () => {
     $('save-status').textContent = 'Saving…';
     try {
-      await window.pywebview.api.save_settings({
+      const result = await window.pywebview.api.save_settings({
         wake_word_threshold: parseFloat($('threshold').value),
         tts_rate: parseInt($('rate').value, 10),
         tts_volume: parseInt($('volume').value, 10) / 100,
@@ -233,7 +249,9 @@
         base_url: $('base-url').value,
         api_key: $('api-key').value,
       });
-      $('save-status').textContent = 'Saved. Restart Jarvis for the AI provider / wake word / server changes to fully apply.';
+      $('save-status').textContent = result && result.applied_live
+        ? 'Saved. AI provider change is live now -- try a command. (Wake word / remote-server changes still need a restart.)'
+        : 'Saved. Restart Jarvis for wake word / remote-server changes to fully apply.';
     } catch (e) {
       $('save-status').textContent = 'Error saving: ' + e;
     }

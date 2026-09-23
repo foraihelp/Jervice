@@ -18,7 +18,7 @@ from jarvis.audio.recorder import record_command
 from jarvis.audio.stt import Transcriber
 from jarvis.audio.tts import Speaker
 from jarvis.audio.wake_word import WakeWordListener
-from jarvis.brain import create_brain
+from jarvis.brain import BrainHolder, create_brain
 from jarvis.brain.memory import Memory
 from jarvis.config import load_config
 from jarvis.server import run_server
@@ -54,7 +54,9 @@ def main() -> None:
     logger.info("Starting Jarvis...")
 
     memory = Memory(config.memory_file, config.history_turns, provider=config.brain_provider)
-    brain = create_brain(config, memory)
+    # Boxed so Settings can hot-swap the active brain (provider/model/key
+    # change) in place, without restarting -- see SettingsAPI.save_settings.
+    brain_holder = BrainHolder(create_brain(config, memory))
     speaker = Speaker(rate=config.tts_rate, volume=config.tts_volume, voice_id=config.tts_voice_id)
     transcriber = Transcriber(
         model_size=config.stt_model_size,
@@ -81,7 +83,7 @@ def main() -> None:
 
     tray = TrayApp(on_quit=lambda: os._exit(0), on_show=show_window)
 
-    window = create_main_window(brain, transcriber, config, tray)
+    window = create_main_window(brain_holder, transcriber, config, tray)
     window_holder["window"] = window
 
     if not config.has_api_key:
@@ -97,7 +99,7 @@ def main() -> None:
                 "icon, bottom of the left rail) to get started -- you can "
                 "also switch AI providers there.",
             )
-            open_settings_window(config)
+            open_settings_window(config, brain_holder)
 
         try:
             window.events.loaded += _prompt_for_api_key
@@ -127,7 +129,7 @@ def main() -> None:
 
         before = registry.call_count()
         try:
-            reply = brain.respond(text)
+            reply = brain_holder.brain.respond(text)
         except Exception as exc:  # noqa: BLE001 - never let one bad turn kill the loop
             logger.exception("Brain error")
             reply = "Sorry, I hit an error handling that."
@@ -152,7 +154,7 @@ def main() -> None:
     if config.server_enabled:
         threading.Thread(
             target=run_server,
-            args=(brain, config.api_token, config.server_host, config.server_port),
+            args=(brain_holder, config.api_token, config.server_host, config.server_port),
             daemon=True,
         ).start()
         logger.info(

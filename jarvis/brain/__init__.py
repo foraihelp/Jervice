@@ -13,6 +13,21 @@ from typing import Any
 from jarvis.brain.memory import Memory
 
 
+class BrainHolder:
+    """A mutable box around the active brain instance.
+
+    Both the main window (JarvisAPI) and the remote iOS API server
+    (jarvis/server.py) read `.brain` through this holder rather than
+    closing over a Brain object directly, so that switching AI provider in
+    Settings can swap the live brain in place -- no restart required. See
+    SettingsAPI.save_settings in jarvis/ui/window.py, which rebuilds and
+    reassigns `.brain` after a provider/model/key change.
+    """
+
+    def __init__(self, brain):
+        self.brain = brain
+
+
 def create_brain(config: Any, memory: Memory):
     """Returns an AnthropicBrain or OpenAIBrain instance, matching
     config.brain_provider ("anthropic" or "openai" -- the latter also

@@ -36,8 +36,8 @@ _settings_window = None  # module-level singleton so "open settings" twice re-fo
 class JarvisAPI:
     """Exposed to main.html as `window.pywebview.api`."""
 
-    def __init__(self, brain, transcriber, config, tray):
-        self.brain = brain
+    def __init__(self, brain_holder, transcriber, config, tray):
+        self.brain_holder = brain_holder
         self.transcriber = transcriber
         self.config = config
         self.tray = tray
@@ -64,7 +64,7 @@ class JarvisAPI:
         from jarvis.tools import registry
 
         before = registry.call_count()
-        reply = self.brain.respond(text)
+        reply = self.brain_holder.brain.respond(text)
         after = registry.call_count()
         tools = registry.get_recent_calls(after - before) if after > before else []
         return {"reply": reply, "tools": tools}
@@ -86,7 +86,7 @@ class JarvisAPI:
             return {"heard": "", "reply": "", "tools": []}
 
         before = registry.call_count()
-        reply = self.brain.respond(text)
+        reply = self.brain_holder.brain.respond(text)
         after = registry.call_count()
         tools = registry.get_recent_calls(after - before) if after > before else []
         return {"heard": text, "reply": reply, "tools": tools}
@@ -109,7 +109,7 @@ class JarvisAPI:
             self.window.hide()
 
     def open_settings(self) -> None:
-        open_settings_window(self.config)
+        open_settings_window(self.config, self.brain_holder)
 
     def quit(self) -> None:
         logger.info("Quit requested from main window.")
@@ -119,8 +119,15 @@ class JarvisAPI:
 class SettingsAPI:
     """Exposed to settings.html as `window.pywebview.api`."""
 
-    def __init__(self, config):
+    # save_settings() payload keys that require rebuilding the live brain
+    # (and its memory, since Anthropic/OpenAI message formats aren't
+    # cross-compatible -- see Memory's provider tag) to take effect
+    # immediately instead of needing a full restart.
+    _BRAIN_AFFECTING_KEYS = {"provider", "model", "base_url", "api_key"}
+
+    def __init__(self, config, brain_holder):
         self.config = config
+        self.brain_holder = brain_holder
         self.window = None  # set by open_settings_window() right after the window exists
 
     def get_settings(self) -> dict[str, Any]:
@@ -142,22 +149,36 @@ class SettingsAPI:
         }
 
     def save_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
-        from jarvis.config import save_settings
+        from jarvis.config import load_config, save_settings
 
         save_settings(payload)
-        return {"ok": True}
+        self.config = load_config()
+
+        applied_live = False
+        if self._BRAIN_AFFECTING_KEYS & payload.keys():
+            try:
+                from jarvis.brain import create_brain
+                from jarvis.brain.memory import Memory
+
+                memory = Memory(self.config.memory_file, self.config.history_turns, provider=self.config.brain_provider)
+                self.brain_holder.brain = create_brain(self.config, memory)
+                applied_live = True
+            except Exception:
+                logger.exception("Could not hot-swap the brain after a Settings save; restart Jarvis to apply it.")
+
+        return {"ok": True, "applied_live": applied_live}
 
     def close(self) -> None:
         if self.window is not None:
             self.window.destroy()
 
 
-def create_main_window(brain, transcriber, config, tray):
+def create_main_window(brain_holder, transcriber, config, tray):
     """Creates and returns the main pywebview window. Must be called
     before webview.start()."""
     import webview
 
-    api = JarvisAPI(brain=brain, transcriber=transcriber, config=config, tray=tray)
+    api = JarvisAPI(brain_holder=brain_holder, transcriber=transcriber, config=config, tray=tray)
     window = webview.create_window(
         "Jarvis",
         str(ASSETS_DIR / "main.html"),
@@ -186,7 +207,7 @@ def create_main_window(brain, transcriber, config, tray):
     return window
 
 
-def open_settings_window(config) -> None:
+def open_settings_window(config, brain_holder) -> None:
     """Opens the settings window, or re-focuses it if already open."""
     global _settings_window
 
@@ -200,7 +221,7 @@ def open_settings_window(config) -> None:
 
     import webview
 
-    api = SettingsAPI(config)
+    api = SettingsAPI(config, brain_holder)
     window = webview.create_window(
         "Jarvis Settings",
         str(ASSETS_DIR / "settings.html"),
