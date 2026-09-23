@@ -67,10 +67,10 @@
       <div id="base-url-row" style="margin-top:14px; display:none;">
         <div style="font-size:11px; color:#56677A; margin-bottom:6px;">BASE URL (optional)</div>
         <input id="base-url" type="text" placeholder="Leave blank for api.openai.com">
-        <div style="font-size:11px; color:#4A5A6A; margin-top:6px; margin-bottom:10px;">Set this to use any OpenAI-compatible endpoint instead. Quick fill (still update the Model field and API key to match):</div>
+        <div style="font-size:11px; color:#4A5A6A; margin-top:6px; margin-bottom:10px;">Set this to use any OpenAI-compatible endpoint instead. Quick fill (still update the API key to match) &mdash; providers rename/retire models over time, so if the filled-in model 404s, check that provider's current model list:</div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <div class="preset-btn" data-url="" data-model="gpt-4o" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">OpenAI</div>
-          <div class="preset-btn" data-url="https://api.groq.com/openai/v1" data-model="llama-3.3-70b-versatile" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">Groq</div>
+          <div class="preset-btn" data-url="https://api.groq.com/openai/v1" data-model="openai/gpt-oss-120b" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">Groq</div>
           <div class="preset-btn" data-url="https://api.together.xyz/v1" data-model="meta-llama/Llama-3.3-70B-Instruct-Turbo" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">Together</div>
           <div class="preset-btn" data-url="https://openrouter.ai/api/v1" data-model="openai/gpt-4o" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">OpenRouter</div>
           <div class="preset-btn" data-url="http://localhost:11434/v1" data-model="llama3.3" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">Local Ollama</div>
