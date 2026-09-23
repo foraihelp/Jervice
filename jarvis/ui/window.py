@@ -36,11 +36,12 @@ _settings_window = None  # module-level singleton so "open settings" twice re-fo
 class JarvisAPI:
     """Exposed to main.html as `window.pywebview.api`."""
 
-    def __init__(self, brain_holder, transcriber, config, tray):
+    def __init__(self, brain_holder, transcriber, config, tray, wake_word_listener=None):
         self.brain_holder = brain_holder
         self.transcriber = transcriber
         self.config = config
         self.tray = tray
+        self.wake_word_listener = wake_word_listener
         self.window = None  # set by create_main_window() right after the window exists
 
     def get_state(self) -> dict[str, Any]:
@@ -92,12 +93,24 @@ class JarvisAPI:
         from jarvis.audio.recorder import record_command
         from jarvis.tools import registry
 
-        audio = record_command(
-            sample_rate=self.config.sample_rate,
-            silence_seconds=self.config.silence_seconds,
-            max_seconds=self.config.max_record_seconds,
-            silence_rms_threshold=self.config.silence_rms_threshold,
-        )
+        # The wake-word listener holds the mic open continuously in the
+        # background; some audio drivers refuse to open a second stream on
+        # the same device while that one's active ("Device unavailable").
+        # Borrow it for the duration of this recording, same as
+        # WakeWordListener.listen_forever() already does around a
+        # wake-word-triggered recording.
+        if self.wake_word_listener is not None:
+            self.wake_word_listener.pause()
+        try:
+            audio = record_command(
+                sample_rate=self.config.sample_rate,
+                silence_seconds=self.config.silence_seconds,
+                max_seconds=self.config.max_record_seconds,
+                silence_rms_threshold=self.config.silence_rms_threshold,
+            )
+        finally:
+            if self.wake_word_listener is not None:
+                self.wake_word_listener.resume()
         text = self.transcriber.transcribe(audio, self.config.sample_rate)
         if not text:
             return {"heard": "", "reply": "", "tools": []}
@@ -190,12 +203,18 @@ class SettingsAPI:
             self.window.destroy()
 
 
-def create_main_window(brain_holder, transcriber, config, tray):
+def create_main_window(brain_holder, transcriber, config, tray, wake_word_listener=None):
     """Creates and returns the main pywebview window. Must be called
     before webview.start()."""
     import webview
 
-    api = JarvisAPI(brain_holder=brain_holder, transcriber=transcriber, config=config, tray=tray)
+    api = JarvisAPI(
+        brain_holder=brain_holder,
+        transcriber=transcriber,
+        config=config,
+        tray=tray,
+        wake_word_listener=wake_word_listener,
+    )
     window = webview.create_window(
         "Jarvis",
         str(ASSETS_DIR / "main.html"),

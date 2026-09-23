@@ -91,7 +91,13 @@ def main() -> None:
 
     tray = TrayApp(on_quit=lambda: os._exit(0), on_show=show_window)
 
-    window = create_main_window(brain_holder, transcriber, config, tray)
+    # Created here (not inside wake_word_thread() below) so trigger_listen()
+    # (the orb click, in jarvis/ui/window.py) can also pause/resume it --
+    # both that path and the wake-word-triggered one record a command via
+    # the same microphone, and only one of them can have it open at a time.
+    wake_word_listener = WakeWordListener(config.wake_word_model, config.wake_word_threshold)
+
+    window = create_main_window(brain_holder, transcriber, config, tray, wake_word_listener)
     window_holder["window"] = window
 
     if not config.has_api_key:
@@ -170,9 +176,8 @@ def main() -> None:
         speaker.say(reply)
 
     def wake_word_thread() -> None:
-        listener = WakeWordListener(config.wake_word_model, config.wake_word_threshold)
         try:
-            listener.listen_forever(handle_wake)
+            wake_word_listener.listen_forever(handle_wake)
         except MicrophoneError as exc:
             # Opening the mic for continuous wake-word listening failed
             # right at startup -- without this, the thread just dies and
