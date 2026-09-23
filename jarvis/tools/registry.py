@@ -96,6 +96,11 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "input_schema": {"type": "object", "properties": {}},
     },
     {
+        "name": "get_default_output_device",
+        "description": "Reports which audio device (speakers/headphones/monitor) Windows is currently sending sound to. Use this if the user says they can't hear you / TTS seems silent / audio isn't working -- it's very often because the default output is a Bluetooth headset or a display's speakers that isn't actually in use, not a real problem.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "take_screenshot",
         "description": "Capture a screenshot of the full screen and save it to disk.",
         "input_schema": {"type": "object", "properties": {}},
@@ -194,6 +199,7 @@ TOOL_DISPATCH: dict[str, Callable[..., str]] = {
     "close_window": lambda title_substring: windows_control.close_window(title_substring),
     "set_volume": lambda percent: system.set_volume(percent),
     "get_volume": lambda: system.get_volume(),
+    "get_default_output_device": lambda: system.get_default_output_device(),
     "take_screenshot": lambda: system.take_screenshot(),
     "lock_workstation": lambda: system.lock_workstation(),
     "search_files": lambda query, root="": files.search_files(query, root),

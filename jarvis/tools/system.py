@@ -62,39 +62,50 @@ def get_brightness() -> str:
 
 
 def set_volume(percent: float) -> str:
-    """Sets system output volume to `percent` (0-100)."""
+    """Sets output volume (of the current default playback device -- see
+    get_default_output_device()) to `percent` (0-100)."""
     percent = max(0.0, min(100.0, float(percent)))
     try:
-        from ctypes import POINTER, cast
+        from pycaw.pycaw import AudioUtilities
 
-        from comtypes import CLSCTX_ALL
-        from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-
-        devices = AudioUtilities.GetSpeakers()
-        interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-        volume = cast(interface, POINTER(IAudioEndpointVolume))
-        volume.SetMasterVolumeLevelScalar(percent / 100.0, None)
-        return f"Volume set to {int(percent)}%."
-    except Exception as exc:
+        device = AudioUtilities.GetSpeakers()
+        device.volume_percent = percent
+        return f"Volume set to {int(percent)}% on {device.FriendlyName}."
+    except Exception as exc:  # noqa: BLE001
         logger.warning("Failed to set volume: %s", exc)
         return f"I couldn't change the volume: {exc}"
 
 
 def get_volume() -> str:
     try:
-        from ctypes import POINTER, cast
+        from pycaw.pycaw import AudioUtilities
 
-        from comtypes import CLSCTX_ALL
-        from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-
-        devices = AudioUtilities.GetSpeakers()
-        interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-        volume = cast(interface, POINTER(IAudioEndpointVolume))
-        level = volume.GetMasterVolumeLevelScalar()
-        return f"Current volume is {round(level * 100)}%."
-    except Exception as exc:
+        device = AudioUtilities.GetSpeakers()
+        return f"Current volume is {round(device.volume_percent)}% on {device.FriendlyName}."
+    except Exception as exc:  # noqa: BLE001
         logger.warning("Failed to read volume: %s", exc)
         return f"I couldn't read the volume: {exc}"
+
+
+def get_default_output_device() -> str:
+    """Reports which device Windows is currently sending audio to -- useful
+    when TTS/audio seems to have "gone silent": if this is a Bluetooth
+    headset or a monitor's speakers rather than what you're actually
+    listening on, that's almost always why, not a bug in the app. Windows'
+    default output can only be changed from Settings -> System -> Sound (no
+    supported API for an app to change it, so this is read-only)."""
+    try:
+        from pycaw.pycaw import AudioUtilities
+
+        device = AudioUtilities.GetSpeakers()
+        return (
+            f"Audio is currently going to '{device.FriendlyName}'. If that's not what "
+            "you're listening on, change it in Windows Settings -> System -> Sound -> "
+            "Output."
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to read default output device: %s", exc)
+        return f"I couldn't check the default output device: {exc}"
 
 
 def take_screenshot(save_dir: str = "data/screenshots") -> str:
