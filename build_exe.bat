@@ -20,6 +20,9 @@ pyinstaller ^
   --collect-all PIL ^
   --collect-all webview ^
   --collect-all openai ^
+  --collect-all ddgs ^
+  --collect-all primp ^
+  --collect-all lxml ^
   --hidden-import pyttsx3.drivers ^
   --hidden-import pyttsx3.drivers.sapi5 ^
   --hidden-import win32timezone ^

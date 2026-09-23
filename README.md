@@ -31,17 +31,21 @@ Troubleshooting if it fails to appear.
 
 - Open/close applications ("open notepad", "close spotify")
 - List, focus, minimize, maximize, close windows by title
-- Set/read system volume
+- Set/read system volume and screen brightness (brightness only works on
+  displays with software support -- typically laptop screens, not most
+  external/desktop monitors)
+- Report system status: CPU/RAM/disk usage, battery level if present
 - Take a screenshot
 - Lock the workstation
 - Search for and open files, read text file contents
-- Open URLs / trigger a browser search
+- Real web search (actual DuckDuckGo results, not just opening a browser
+  tab) and Wikipedia article summaries
+- Open URLs in the browser
 - Remembers recent conversation across turns (stored locally in
   `data/memory.json`)
 
-It does **not** do real web search/browsing (only opens a browser tab),
-does not integrate with email/calendar (not wired up), and does not
-shut down/restart your PC (intentionally omitted — too risky for a
+It does **not** integrate with email/calendar (not wired up), and does
+not shut down/restart your PC (intentionally omitted — too risky for a
 voice-triggered tool).
 
 ## Requirements

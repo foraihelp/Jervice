@@ -1,6 +1,6 @@
 """Central registry: Anthropic tool-use schemas + dispatch to the actual
-Python functions in apps.py / windows_control.py / system.py / files.py /
-web.py.
+Python functions in apps.py / windows_control.py / system.py /
+system_monitor.py / files.py / web.py.
 
 To add a new tool: write the function, add a schema entry to TOOL_SCHEMAS,
 and add a matching entry to TOOL_DISPATCH. That's it -- the brain's
@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-from jarvis.tools import apps, files, system, web, windows_control
+from jarvis.tools import apps, files, system, system_monitor, web, windows_control
 
 logger = logging.getLogger("jarvis.tools.registry")
 
@@ -146,12 +146,40 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "web_search",
-        "description": "Open a web search for a query in the default browser. Note: this opens a browser tab, it does NOT return search results to you directly.",
+        "description": "Runs a real DuckDuckGo web search and returns the top few results (title + snippet) as text, no browser needed. Good for current-events or factual questions you don't already know the answer to. Falls back to opening a full browser search only if the search itself fails.",
         "input_schema": {
             "type": "object",
             "properties": {"query": {"type": "string", "description": "Search query."}},
             "required": ["query"],
         },
+    },
+    {
+        "name": "wikipedia_lookup",
+        "description": "Fetches a short summary of a Wikipedia article and returns it as text. Best for 'who/what is X' questions about a specific person, place, or thing.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "Topic or article title to look up, e.g. 'Ada Lovelace' or 'Mount Everest'."}},
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "get_system_status",
+        "description": "Reports current CPU usage, RAM usage, main-drive disk space, and battery status (if this machine has a battery).",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "set_brightness",
+        "description": "Sets screen brightness to a percentage (0-100). Only works on displays with software brightness support (most laptop screens; typically not external/desktop monitors).",
+        "input_schema": {
+            "type": "object",
+            "properties": {"percent": {"type": "number", "description": "Target brightness, 0-100."}},
+            "required": ["percent"],
+        },
+    },
+    {
+        "name": "get_brightness",
+        "description": "Gets the current screen brightness percentage, if the display supports software brightness control.",
+        "input_schema": {"type": "object", "properties": {}},
     },
 ]
 
@@ -173,6 +201,10 @@ TOOL_DISPATCH: dict[str, Callable[..., str]] = {
     "read_text_file": lambda path: files.read_text_file(path),
     "open_url": lambda url: web.open_url(url),
     "web_search": lambda query: web.web_search(query),
+    "wikipedia_lookup": lambda query: web.wikipedia_lookup(query),
+    "get_system_status": lambda: system_monitor.get_system_status(),
+    "set_brightness": lambda percent: system.set_brightness(percent),
+    "get_brightness": lambda: system.get_brightness(),
 }
 
 

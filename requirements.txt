@@ -37,3 +37,8 @@ pygetwindow>=0.0.9
 psutil>=6.0.0
 pycaw>=20240210; sys_platform == "win32"   # volume control
 comtypes>=1.4.5; sys_platform == "win32"   # required by pycaw
+
+# Real web search (jarvis/tools/web.py) -- DuckDuckGo's public "instant
+# answer" API is effectively dead for real queries, so this scrapes actual
+# search results instead. Pulls in lxml + primp (a Rust HTTP client).
+ddgs>=9.0
