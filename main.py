@@ -13,7 +13,9 @@ import logging
 import os
 import sys
 import threading
+import time
 
+from jarvis.audio.errors import MicrophoneError
 from jarvis.audio.recorder import record_command
 from jarvis.audio.stt import Transcriber
 from jarvis.audio.tts import Speaker
@@ -128,12 +130,23 @@ def main() -> None:
             return
 
         push_status(window, listening=True, statusLine="LISTENING...")
-        audio = record_command(
-            sample_rate=config.sample_rate,
-            silence_seconds=config.silence_seconds,
-            max_seconds=config.max_record_seconds,
-            silence_rms_threshold=config.silence_rms_threshold,
-        )
+        try:
+            audio = record_command(
+                sample_rate=config.sample_rate,
+                silence_seconds=config.silence_seconds,
+                max_seconds=config.max_record_seconds,
+                silence_rms_threshold=config.silence_rms_threshold,
+            )
+        except MicrophoneError as exc:
+            # Not caught, this would kill the wake-word background thread
+            # entirely (silently, from the user's perspective -- "Hey
+            # Jarvis" would just stop doing anything, forever, with no
+            # indication why) since this runs inside WakeWordListener's
+            # on_wake callback with nothing else to catch it.
+            logger.warning("Microphone error while recording a command: %s", exc)
+            push_message(window, "jarvis", str(exc))
+            push_status(window, listening=False, statusLine="WAKE WORD · HEY JARVIS")
+            return
         text = transcriber.transcribe(audio, config.sample_rate)
         if not text:
             logger.info("Heard nothing intelligible, ignoring.")
@@ -158,7 +171,22 @@ def main() -> None:
 
     def wake_word_thread() -> None:
         listener = WakeWordListener(config.wake_word_model, config.wake_word_threshold)
-        listener.listen_forever(handle_wake)
+        try:
+            listener.listen_forever(handle_wake)
+        except MicrophoneError as exc:
+            # Opening the mic for continuous wake-word listening failed
+            # right at startup -- without this, the thread just dies and
+            # "Hey Jarvis" silently never works again, with nothing in the
+            # UI to explain why. The window may not have finished loading
+            # yet this early, so retry the push for a few seconds rather
+            # than losing the message to push_message's normal
+            # fail-silently behavior (fine for routine status updates, not
+            # for the one message explaining why voice input is dead).
+            logger.warning("Microphone error starting wake word listener: %s", exc)
+            for _ in range(20):
+                if push_message(window, "jarvis", str(exc)):
+                    break
+                time.sleep(0.5)
 
     threading.Thread(target=wake_word_thread, daemon=True).start()
     # The tray icon runs in a background thread (not the main thread) on

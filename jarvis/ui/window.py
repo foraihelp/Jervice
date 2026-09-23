@@ -263,18 +263,23 @@ def open_settings_window(config, brain_holder) -> None:
     _settings_window = window
 
 
-def push_message(window, role: str, text: str, tools: Optional[list[str]] = None) -> None:
+def push_message(window, role: str, text: str, tools: Optional[list[str]] = None) -> bool:
     """Appends a message to the main window's transcript from any thread
     (e.g. the wake-word background loop). Safe to call even if the window
-    isn't ready yet or was already closed -- failures are swallowed."""
+    isn't ready yet or was already closed -- failures are swallowed, and
+    False is returned so a caller with something important to say (e.g.
+    "the microphone doesn't work") can retry until the window is ready
+    rather than losing the message."""
     if window is None:
-        return
+        return False
     try:
         window.evaluate_js(
             f"appendMessage({json.dumps(role)}, {json.dumps(text)}, {json.dumps(tools or [])})"
         )
+        return True
     except Exception:
         logger.debug("push_message failed (window not ready?)", exc_info=True)
+        return False
 
 
 def push_status(window, **fields: Any) -> None:

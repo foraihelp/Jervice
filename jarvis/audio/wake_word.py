@@ -13,6 +13,8 @@ from typing import Callable
 import numpy as np
 import sounddevice as sd
 
+from jarvis.audio.errors import MIC_HELP_TEXT, MicrophoneError
+
 logger = logging.getLogger("jarvis.wake_word")
 
 # openWakeWord's pretrained models expect 16kHz mono audio in 80ms frames
@@ -60,13 +62,20 @@ class WakeWordListener:
                 logger.debug("Audio input status: %s", status)
             buffer = np.concatenate([buffer, indata[:, 0]])
 
-        with sd.InputStream(
-            samplerate=SAMPLE_RATE,
-            channels=1,
-            dtype="int16",
-            callback=callback,
-            blocksize=FRAME_SAMPLES,
-        ):
+        try:
+            stream = sd.InputStream(
+                samplerate=SAMPLE_RATE,
+                channels=1,
+                dtype="int16",
+                callback=callback,
+                blocksize=FRAME_SAMPLES,
+            )
+            stream.start()
+        except Exception as exc:  # noqa: BLE001 - PortAudioError/OSError depending on the failure
+            logger.warning("Could not open microphone for wake word listening: %s", exc)
+            raise MicrophoneError(MIC_HELP_TEXT) from exc
+
+        with stream:
             while not self._stop:
                 if len(buffer) < FRAME_SAMPLES:
                     sd.sleep(20)

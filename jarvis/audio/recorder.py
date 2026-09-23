@@ -17,6 +17,8 @@ import logging
 import numpy as np
 import sounddevice as sd
 
+from jarvis.audio.errors import MIC_HELP_TEXT, MicrophoneError
+
 logger = logging.getLogger("jarvis.recorder")
 
 FRAME_MS = 30  # size of each analysis chunk
@@ -55,13 +57,20 @@ def record_command(
         buffer = np.concatenate([buffer, indata[:, 0]])
 
     logger.info("Recording command...")
-    with sd.InputStream(
-        samplerate=sample_rate,
-        channels=1,
-        dtype="int16",
-        callback=callback,
-        blocksize=frame_samples,
-    ):
+    try:
+        stream = sd.InputStream(
+            samplerate=sample_rate,
+            channels=1,
+            dtype="int16",
+            callback=callback,
+            blocksize=frame_samples,
+        )
+        stream.start()
+    except Exception as exc:  # noqa: BLE001 - sounddevice raises PortAudioError/OSError depending on the failure
+        logger.warning("Could not open microphone input stream: %s", exc)
+        raise MicrophoneError(MIC_HELP_TEXT) from exc
+
+    with stream:
         frame_count = 0
         while frame_count < max_frames:
             if len(buffer) < frame_samples:
