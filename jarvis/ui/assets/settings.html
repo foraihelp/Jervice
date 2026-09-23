@@ -46,7 +46,7 @@
 <div style="width:100%; height:100%; display:flex; flex-direction:column; position:relative;">
   <div style="position:absolute; inset:0; pointer-events:none; background: radial-gradient(420px 280px at 90% -10%, rgba(79,166,255,0.09), transparent 60%);"></div>
 
-  <div class="drag" style="position:relative; height:52px; min-height:52px; display:flex; align-items:center; justify-content:space-between; padding:0 18px; border-bottom:1px solid rgba(120,190,255,0.12);">
+  <div class="drag pywebview-drag-region" style="position:relative; height:52px; min-height:52px; display:flex; align-items:center; justify-content:space-between; padding:0 18px; border-bottom:1px solid rgba(120,190,255,0.12);">
     <div style="font-size:13px; font-weight:600; letter-spacing:0.14em;">SETTINGS</div>
     <svg id="close-btn" class="no-drag" width="14" height="14" viewBox="0 0 24 24" fill="none" style="opacity:0.6; cursor:pointer;"><path d="M6 6l12 12M18 6L6 18" stroke="#8CA0B3" stroke-width="1.6" stroke-linecap="round"/></svg>
   </div>
@@ -163,6 +163,14 @@
 </div>
 
 <script>
+  // See main.html for why this is needed: pywebview's Windows backend
+  // drags frameless windows via its own '.pywebview-drag-region' class
+  // (on the title bar above), not the -webkit-app-region CSS below, and
+  // without this the close button would also start a drag on click.
+  document.querySelectorAll('.no-drag').forEach((el) => {
+    el.addEventListener('mousedown', (e) => e.stopPropagation());
+  });
+
   const $ = (id) => document.getElementById(id);
 
   function bindRange(id, valueId, format) {
