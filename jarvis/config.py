@@ -84,6 +84,12 @@ class Config:
         return self.raw["tts"].get("voice_id", "") or ""
 
     @property
+    def tts_output_device(self) -> str:
+        """Substring to match against a SAPI5 audio output device name (see
+        jarvis/audio/tts.py's Speaker). Empty = system default."""
+        return self.raw["tts"].get("output_device", "") or ""
+
+    @property
     def brain_provider(self) -> str:
         """'anthropic' (Claude) or 'openai' (OpenAI, or any OpenAI-compatible
         endpoint -- see brain_base_url). Defaults to 'anthropic' so existing
@@ -220,7 +226,9 @@ def save_settings(payload: dict[str, Any]) -> None:
     a GUI save instead of being stripped.
 
     Recognized payload keys (all optional): wake_word_threshold (float),
-    tts_rate (int), tts_volume (float 0-1), server_enabled (bool),
+    tts_rate (int), tts_volume (float 0-1), tts_output_device (str,
+    substring of a SAPI5 device name, blank = system default),
+    server_enabled (bool),
     server_port (int), api_token (str, written to .env not config.yaml),
     provider ("anthropic" or "openai"), model (str), base_url (str, only
     meaningful for "openai"), api_key (str, written to .env not
@@ -242,6 +250,8 @@ def save_settings(payload: dict[str, Any]) -> None:
         data["tts"]["rate"] = int(payload["tts_rate"])
     if "tts_volume" in payload:
         data["tts"]["volume"] = float(payload["tts_volume"])
+    if "tts_output_device" in payload:
+        data["tts"]["output_device"] = (payload["tts_output_device"] or "").strip()
     if "server_enabled" in payload:
         data.setdefault("server", {})["enabled"] = bool(payload["server_enabled"])
     if "server_port" in payload:

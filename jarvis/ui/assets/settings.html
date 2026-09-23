@@ -11,12 +11,12 @@
   .drag { -webkit-app-region: drag; }
   .no-drag { -webkit-app-region: no-drag; }
 
-  input[type=text], input[type=password], input[type=number] {
+  input[type=text], input[type=password], input[type=number], select {
     font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #D7E2EA;
     background: #0A0F16; border: 1px solid rgba(120,190,255,0.16); padding: 9px 12px;
     border-radius: 6px; outline: none; width: 100%;
   }
-  input:focus { border-color: rgba(111,227,255,0.5); }
+  input:focus, select:focus { border-color: rgba(111,227,255,0.5); }
   input[type=range] {
     -webkit-appearance: none; width: 100%; height: 4px; border-radius: 2px;
     background: rgba(120,190,255,0.14); outline: none;
@@ -126,6 +126,11 @@
           </div>
           <input id="volume" type="range" min="0" max="100" step="5" value="100">
         </div>
+      </div>
+      <div style="margin-top:18px;">
+        <div style="font-size:11px; color:#56677A; margin-bottom:6px;">OUTPUT DEVICE</div>
+        <select id="output-device"><option value="">System default</option></select>
+        <div style="font-size:11px; color:#4A5A6A; margin-top:6px;">Pin Jarvis's own speech to this device, regardless of what Windows currently calls the default -- fixes speech silently going nowhere when a paired Bluetooth headset stays "default" while turned off. Requires a restart to apply.</div>
       </div>
     </div>
 
@@ -246,6 +251,32 @@
     });
   });
 
+  async function loadOutputDevices(selected) {
+    try {
+      const devices = await window.pywebview.api.list_audio_output_devices();
+      const select = $('output-device');
+      select.innerHTML = '<option value="">System default</option>';
+      devices.forEach((name) => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        select.appendChild(opt);
+      });
+      // Saved value is a substring match, not necessarily an exact device
+      // name (see Speaker._pin_output_device) -- select the first option
+      // that contains it, falling back to "System default" if none match
+      // (e.g. a device that's since been unplugged/renamed).
+      if (selected) {
+        const match = Array.from(select.options).find(
+          (o) => o.value && o.value.toLowerCase().includes(selected.toLowerCase())
+        );
+        select.value = match ? match.value : '';
+      }
+    } catch (e) {
+      // Non-fatal: the dropdown just stays at "System default" if this fails.
+    }
+  }
+
   async function loadSettings() {
     try {
       const s = await window.pywebview.api.get_settings();
@@ -255,6 +286,7 @@
       $('rate-value').textContent = s.tts_rate + ' wpm';
       $('volume').value = Math.round(s.tts_volume * 100);
       $('volume-value').textContent = Math.round(s.tts_volume * 100) + '%';
+      loadOutputDevices(s.tts_output_device || '');
       $('port').value = s.server_port;
       $('token').value = s.api_token || '';
       serverEnabled = !!s.server_enabled;
@@ -278,6 +310,7 @@
         wake_word_threshold: parseFloat($('threshold').value),
         tts_rate: parseInt($('rate').value, 10),
         tts_volume: parseInt($('volume').value, 10) / 100,
+        tts_output_device: $('output-device').value,
         server_enabled: serverEnabled,
         server_port: parseInt($('port').value, 10),
         api_token: $('token').value,
@@ -287,8 +320,8 @@
         api_key: $('api-key').value,
       });
       $('save-status').textContent = result && result.applied_live
-        ? 'Saved. AI provider change is live now -- try a command. (Wake word / remote-server changes still need a restart.)'
-        : 'Saved. Restart Jarvis for wake word / remote-server changes to fully apply.';
+        ? 'Saved. AI provider change is live now -- try a command. (Wake word / voice / remote-server changes still need a restart.)'
+        : 'Saved. Restart Jarvis for wake word / voice / remote-server changes to fully apply.';
     } catch (e) {
       $('save-status').textContent = 'Error saving: ' + e;
     }

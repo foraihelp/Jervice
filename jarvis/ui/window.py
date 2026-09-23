@@ -83,7 +83,17 @@ class JarvisAPI:
         from jarvis.tools import registry
 
         before = registry.call_count()
-        reply = self.brain_holder.brain.respond(text)
+        try:
+            reply = self.brain_holder.brain.respond(text)
+        except Exception:
+            # Without this, a brain-side failure (bad/missing API key, network
+            # error, provider outage) propagated as an uncaught exception
+            # through pywebview's bridge -- the UI showed nothing spoken and
+            # nothing useful in text either, just a rejected-promise error in
+            # the browser console. Matches the try/except already around
+            # handle_wake()'s brain.respond() call in main.py.
+            logger.exception("brain.respond() failed for typed command %r", text)
+            reply = "Sorry, I ran into a problem answering that. Please check your AI provider settings and try again."
         after = registry.call_count()
         tools = registry.get_recent_calls(after - before) if after > before else []
         if self.speaker is not None:
@@ -119,7 +129,11 @@ class JarvisAPI:
             return {"heard": "", "reply": "", "tools": []}
 
         before = registry.call_count()
-        reply = self.brain_holder.brain.respond(text)
+        try:
+            reply = self.brain_holder.brain.respond(text)
+        except Exception:
+            logger.exception("brain.respond() failed for orb command %r", text)
+            reply = "Sorry, I ran into a problem answering that. Please check your AI provider settings and try again."
         after = registry.call_count()
         tools = registry.get_recent_calls(after - before) if after > before else []
         if self.speaker is not None:
@@ -172,6 +186,7 @@ class SettingsAPI:
             "wake_word_threshold": self.config.wake_word_threshold,
             "tts_rate": self.config.tts_rate,
             "tts_volume": self.config.tts_volume,
+            "tts_output_device": self.config.tts_output_device,
             "server_enabled": self.config.server_enabled,
             "server_port": self.config.server_port,
             "api_token": self.config.api_token,
@@ -184,6 +199,17 @@ class SettingsAPI:
             "anthropic_api_key": self.config.anthropic_api_key,
             "openai_api_key": self.config.openai_api_key,
         }
+
+    def list_audio_output_devices(self) -> list[str]:
+        """Lists this PC's actual available playback devices (by SAPI5's
+        names for them), for the output-device picker below."""
+        from jarvis.audio.tts import Speaker
+
+        try:
+            return Speaker.list_output_devices()
+        except Exception:
+            logger.exception("Could not enumerate audio output devices")
+            return []
 
     def save_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
         from jarvis.config import load_config, save_settings

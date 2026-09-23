@@ -37,6 +37,28 @@ from jarvis.ui.window import (
 logger = logging.getLogger("jarvis.main")
 
 
+class _PywebviewComNoiseFilter(logging.Filter):
+    """Drops a specific, confirmed-harmless class of pywebview log spam:
+    WebView2's COM bridge throwing when pywebview's `window.native.*`
+    property walk touches something that "can only be accessed from the UI
+    thread", plus a pywebview bug where failing to read
+    `AccessibilityObject` recurses into a message hundreds of ".Empty"
+    segments long. Neither reflects a real app problem (confirmed via the
+    live jarvis.log: they arrive in bursts of 5-15 at once, always followed
+    by the app continuing to work normally), but formatting/writing those
+    giant stack traces -- especially the recursive one -- is real, wasted
+    CPU and disk I/O landing at the same moment a user is clicking around,
+    which is exactly when "laggy" gets noticed. Anything else logged by
+    pywebview still comes through untouched."""
+
+    _NOISY_SNIPPETS = ("CoreWebView2 can only be accessed", "CoreWebView2Controller members can only be accessed", "AccessibilityObject")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.name == "pywebview" and any(s in record.getMessage() for s in self._NOISY_SNIPPETS):
+            return False
+        return True
+
+
 def setup_logging(level: str, log_file) -> None:
     log_file.parent.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
@@ -47,6 +69,7 @@ def setup_logging(level: str, log_file) -> None:
             logging.FileHandler(log_file, encoding="utf-8"),
         ],
     )
+    logging.getLogger("pywebview").addFilter(_PywebviewComNoiseFilter())
 
 
 # Arbitrary fixed GUID, not tied to anything else -- just needs to be
@@ -111,7 +134,12 @@ def main() -> None:
     # Boxed so Settings can hot-swap the active brain (provider/model/key
     # change) in place, without restarting -- see SettingsAPI.save_settings.
     brain_holder = BrainHolder(create_brain(config, memory))
-    speaker = Speaker(rate=config.tts_rate, volume=config.tts_volume, voice_id=config.tts_voice_id)
+    speaker = Speaker(
+        rate=config.tts_rate,
+        volume=config.tts_volume,
+        voice_id=config.tts_voice_id,
+        output_device=config.tts_output_device,
+    )
     transcriber = Transcriber(
         model_size=config.stt_model_size,
         device=config.stt_device,

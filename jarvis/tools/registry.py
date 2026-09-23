@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-from jarvis.tools import apps, files, system, system_monitor, web, windows_control
+from jarvis.tools import apps, files, location, system, system_monitor, web, windows_control
 
 logger = logging.getLogger("jarvis.tools.registry")
 
@@ -168,6 +168,11 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "get_current_location",
+        "description": "Reports an approximate current location (city/region/country) based on this PC's internet connection (IP-based geolocation). This is a desktop machine with no real GPS hardware, so it's only accurate to roughly city level -- not precise, and can be wrong if a VPN is active. Use for 'where am I' or location-dependent questions (e.g. as a starting point before a web_search for local weather/news), and be upfront that it's an approximation, not GPS.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "get_system_status",
         "description": "Reports current CPU usage, RAM usage, main-drive disk space, and battery status (if this machine has a battery).",
         "input_schema": {"type": "object", "properties": {}},
@@ -208,6 +213,7 @@ TOOL_DISPATCH: dict[str, Callable[..., str]] = {
     "open_url": lambda url: web.open_url(url),
     "web_search": lambda query: web.web_search(query),
     "wikipedia_lookup": lambda query: web.wikipedia_lookup(query),
+    "get_current_location": lambda: location.get_current_location(),
     "get_system_status": lambda: system_monitor.get_system_status(),
     "set_brightness": lambda percent: system.set_brightness(percent),
     "get_brightness": lambda: system.get_brightness(),

@@ -31,6 +31,14 @@ tts:
   # Leave blank to use the system default voice. To list available voices,
   # run: python -m jarvis.audio.tts --list-voices
   voice_id: ""
+  # Pins Jarvis's own speech to a specific playback device, independent of
+  # whatever Windows currently considers the "default" output -- useful
+  # because a paired-but-disconnected Bluetooth headset can stay the
+  # Windows default, silently swallowing all TTS. Leave blank to just use
+  # the system default. Set to a substring of a device name (e.g. "Realtek"
+  # or "BenQ") -- easiest to set from the app's own Settings window
+  # (gear icon), which lists your actual available devices.
+  output_device: ""
 
 brain:
   # "anthropic" (Claude) or "openai" (OpenAI itself, or ANY OpenAI-compatible
@@ -54,15 +62,19 @@ brain:
     the user's Windows PC. You have tools to open/close applications, manage
     windows, control system volume and screen brightness, take screenshots,
     check system status (CPU/RAM/disk/battery), search/open files, look
-    things up (a quick web search or Wikipedia summary), and open URLs in
-    the browser. Prefer taking action via tools over describing what the
-    user could do. For any question or lookup (weather, facts, current
-    events, "who/what is X"), always answer using web_search or
-    wikipedia_lookup and speak the answer back -- only use open_url when the
-    user explicitly asks you to open a specific site or link, never as a
-    substitute for answering a question. Keep spoken replies short (1-3
-    sentences) since they will be read aloud via text-to-speech -- avoid
-    long lists, code blocks, or markdown in your replies.
+    things up (a quick web search or Wikipedia summary), check an
+    approximate current location, and open URLs in the browser. Prefer
+    taking action via tools over describing what the user could do. For any
+    question or lookup (weather, facts, current events, "who/what is X"),
+    always answer using web_search or wikipedia_lookup and speak the answer
+    back -- only use open_url when the user explicitly asks you to open a
+    specific site or link, never as a substitute for answering a question.
+    This PC has no real GPS -- get_current_location is IP-based and only
+    approximate (city level), so say so if asked, and use it as a starting
+    point (e.g. for a local-weather web_search) rather than presenting it as
+    precise. Keep spoken replies short (1-3 sentences) since they will be
+    read aloud via text-to-speech -- avoid long lists, code blocks, or
+    markdown in your replies.
 
 memory:
   # Number of most recent conversation turns kept in context.
