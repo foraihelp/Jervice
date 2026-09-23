@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import threading
 
 logger = logging.getLogger("jarvis.tts")
 
@@ -21,13 +22,19 @@ class Speaker:
         self._engine.setProperty("volume", volume)
         if voice_id:
             self._engine.setProperty("voice", voice_id)
+        # pyttsx3's engine isn't safe to drive from two threads at once --
+        # now that both the wake-word thread and the orb-click/typed-command
+        # bridge calls can speak a reply, a lock keeps overlapping requests
+        # from garbling each other instead of just queuing up normally.
+        self._lock = threading.Lock()
 
     def say(self, text: str) -> None:
         if not text.strip():
             return
-        logger.info("Speaking: %r", text)
-        self._engine.say(text)
-        self._engine.runAndWait()
+        with self._lock:
+            logger.info("Speaking: %r", text)
+            self._engine.say(text)
+            self._engine.runAndWait()
 
     def list_voices(self) -> list[tuple[str, str]]:
         voices = self._engine.getProperty("voices")

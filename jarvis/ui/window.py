@@ -86,6 +86,8 @@ class JarvisAPI:
         reply = self.brain_holder.brain.respond(text)
         after = registry.call_count()
         tools = registry.get_recent_calls(after - before) if after > before else []
+        if self.speaker is not None:
+            self.speaker.say(reply)
         return {"reply": reply, "tools": tools}
 
     def trigger_listen(self) -> dict[str, Any]:
@@ -120,6 +122,8 @@ class JarvisAPI:
         reply = self.brain_holder.brain.respond(text)
         after = registry.call_count()
         tools = registry.get_recent_calls(after - before) if after > before else []
+        if self.speaker is not None:
+            self.speaker.say(reply)
         return {"heard": text, "reply": reply, "tools": tools}
 
     def toggle_mute(self) -> bool:
