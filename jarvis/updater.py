@@ -118,6 +118,7 @@ def _download(url: str, version: str, set_status: Callable[[dict[str, Any]], Non
         with urllib.request.urlopen(req, timeout=30) as resp, open(dest, "wb") as f:
             total = int(resp.headers.get("Content-Length") or 0) or None
             written = 0
+            last_reported = -1.0
             while True:
                 chunk = resp.read(262144)
                 if not chunk:
@@ -125,7 +126,14 @@ def _download(url: str, version: str, set_status: Callable[[dict[str, Any]], Non
                 f.write(chunk)
                 written += len(chunk)
                 if total:
-                    set_status({"state": "downloading", "percent": round(written / total * 100, 1)})
+                    # Push at most once per whole percentage point -- a
+                    # ~110MB installer in 256KB chunks is ~440 chunks, and
+                    # pushing a JS eval for every single one floods the
+                    # pywebview bridge with no benefit to what's visible.
+                    percent = round(written / total * 100, 1)
+                    if percent - last_reported >= 1.0:
+                        set_status({"state": "downloading", "percent": percent})
+                        last_reported = percent
         _downloaded_installer_path = dest
         set_status({"state": "downloaded", "version": version})
     except Exception as exc:  # noqa: BLE001
