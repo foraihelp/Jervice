@@ -142,7 +142,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "open_url",
-        "description": "Open a URL in the default web browser.",
+        "description": "Opens a URL in the default web browser. Only use this when the user explicitly asks to open a specific site/link (e.g. 'open github.com'). Do NOT use this to answer a question or look something up -- use web_search or wikipedia_lookup instead, which return the answer as text without interrupting the user with a browser window.",
         "input_schema": {
             "type": "object",
             "properties": {"url": {"type": "string", "description": "URL to open."}},
@@ -151,7 +151,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "web_search",
-        "description": "Runs a real DuckDuckGo web search and returns the top few results (title + snippet) as text, no browser needed. Good for current-events or factual questions you don't already know the answer to. Falls back to opening a full browser search only if the search itself fails.",
+        "description": "Runs a real DuckDuckGo web search entirely in the background and returns the top results (title + snippet) as text for you to summarize in your reply. Use this for current-events, weather, or any factual question you don't already know the answer to -- never open_url for this, even if the results are thin; just relay what you found (or that you found nothing) as a normal spoken answer.",
         "input_schema": {
             "type": "object",
             "properties": {"query": {"type": "string", "description": "Search query."}},
@@ -160,7 +160,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "wikipedia_lookup",
-        "description": "Fetches a short summary of a Wikipedia article and returns it as text. Best for 'who/what is X' questions about a specific person, place, or thing.",
+        "description": "Fetches a short summary of a Wikipedia article, entirely in the background, and returns it as text for you to relay -- never opens a browser. Best for 'who/what is X' questions about a specific person, place, or thing.",
         "input_schema": {
             "type": "object",
             "properties": {"query": {"type": "string", "description": "Topic or article title to look up, e.g. 'Ada Lovelace' or 'Mount Everest'."}},
