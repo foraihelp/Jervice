@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import logging
 import threading
+from typing import Callable, Optional
 
 from anthropic import Anthropic
 
 from jarvis.brain.memory import Memory
+from jarvis.brain.streaming import SentenceStreamer
 from jarvis.tools.registry import TOOL_SCHEMAS, run_tool
 
 logger = logging.getLogger("jarvis.brain")
@@ -31,33 +33,61 @@ class AnthropicBrain:
         # conversation, so requests are serialized rather than run concurrently.
         self._lock = threading.Lock()
 
-    def respond(self, user_text: str) -> str:
+    def respond(self, user_text: str, on_sentence: Optional[Callable[[str], None]] = None) -> str:
         """Sends `user_text` to Claude, executes any tool calls it requests,
         and returns the final natural-language reply. Thread-safe: calls
-        from multiple clients (local voice loop + remote API) are serialized."""
-        with self._lock:
-            return self._respond_locked(user_text)
+        from multiple clients (local voice loop + remote API) are serialized.
 
-    def _respond_locked(self, user_text: str) -> str:
+        If `on_sentence` is given, the whole reply is also delivered through
+        it, one sentence at a time, while it is still being generated -- the
+        caller should speak those instead of speaking the return value."""
+        with self._lock:
+            return self._respond_locked(user_text, on_sentence)
+
+    def _create(self, streamer: Optional[SentenceStreamer]):
+        kwargs = dict(
+            model=self.model,
+            max_tokens=self.max_tokens,
+            system=self.system_prompt,
+            tools=TOOL_SCHEMAS,
+            messages=self.memory.recent_messages(),
+        )
+        if streamer is None:
+            return self._client.messages.create(**kwargs)
+        with self._client.messages.stream(**kwargs) as stream:
+            for delta in stream.text_stream:
+                streamer.feed(delta)
+            message = stream.get_final_message()
+        # Flushed after every turn, so a short lead-in before a tool call
+        # ("Let me check that.") is spoken while the tool runs.
+        streamer.flush()
+        return message
+
+    def _respond_locked(self, user_text: str, on_sentence: Optional[Callable[[str], None]]) -> str:
+        streamer = SentenceStreamer(on_sentence) if on_sentence else None
         self.memory.add_message("user", user_text)
 
         for _ in range(MAX_TOOL_ITERATIONS):
-            response = self._client.messages.create(
-                model=self.model,
-                max_tokens=self.max_tokens,
-                system=self.system_prompt,
-                tools=TOOL_SCHEMAS,
-                messages=self.memory.recent_messages(),
-            )
+            response = self._create(streamer)
 
-            self.memory.add_message("assistant", response.content)
+            # Plain dicts, not the SDK's block objects: memory is saved as
+            # JSON, which can't serialize those, and dicts are accepted
+            # back by the API unchanged.
+            self.memory.add_message(
+                "assistant", [block.model_dump(mode="json", exclude_none=True) for block in response.content]
+            )
 
             if response.stop_reason != "tool_use":
                 text = "".join(
                     block.text for block in response.content if block.type == "text"
                 ).strip()
                 self.memory.save()
-                return text or "Done."
+                if not text:
+                    text = "Done."
+                    if streamer:
+                        streamer.feed(text)
+                        streamer.flush()
+                return text
 
             # Execute every tool_use block in this response, collect results.
             tool_results = []
@@ -75,4 +105,8 @@ class AnthropicBrain:
             self.memory.add_message("user", tool_results)
 
         self.memory.save()
-        return "Sorry, that request needed too many steps -- can you break it down?"
+        message = "Sorry, that request needed too many steps -- can you break it down?"
+        if streamer:
+            streamer.feed(message)
+            streamer.flush()
+        return message

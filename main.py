@@ -22,6 +22,7 @@ from jarvis.audio.tts import Speaker
 from jarvis.audio.wake_word import WakeWordListener
 from jarvis.brain import BrainHolder, create_brain
 from jarvis.brain.memory import Memory
+from jarvis.brain.streaming import respond_speaking
 from jarvis.config import load_config
 from jarvis.server import run_server
 from jarvis.tools import registry
@@ -242,17 +243,12 @@ def main() -> None:
         push_status(window, listening=False, statusLine="THINKING...")
 
         before = registry.call_count()
-        try:
-            reply = brain_holder.brain.respond(text)
-        except Exception as exc:  # noqa: BLE001 - never let one bad turn kill the loop
-            logger.exception("Brain error")
-            reply = "Sorry, I hit an error handling that."
+        reply = respond_speaking(brain_holder.brain, text, speaker, "Sorry, I hit an error handling that.")
         after = registry.call_count()
         tools_used = registry.get_recent_calls(after - before) if after > before else []
 
         push_message(window, "jarvis", reply, tools_used)
         push_status(window, statusLine="WAKE WORD · HEY JARVIS")
-        speaker.say(reply)
 
     def wake_word_thread() -> None:
         try:

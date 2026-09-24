@@ -19,6 +19,8 @@ from typing import Any, Optional
 
 logger = logging.getLogger("jarvis.ui")
 
+from jarvis.brain.streaming import respond_speaking
+
 if getattr(sys, "frozen", False):
     # Under PyInstaller, __file__ for a bundled module does not reliably
     # point to a real file on disk (source is packed into an archive), so
@@ -29,6 +31,8 @@ if getattr(sys, "frozen", False):
     ASSETS_DIR = _BUNDLE_ROOT / "jarvis" / "ui" / "assets"
 else:
     ASSETS_DIR = Path(__file__).resolve().parent / "assets"
+
+_BRAIN_ERROR_REPLY = "Sorry, I ran into a problem answering that. Please check your AI provider settings and try again."
 
 _settings_window = None  # module-level singleton so "open settings" twice re-focuses instead of duplicating
 
@@ -83,21 +87,9 @@ class JarvisAPI:
         from jarvis.tools import registry
 
         before = registry.call_count()
-        try:
-            reply = self.brain_holder.brain.respond(text)
-        except Exception:
-            # Without this, a brain-side failure (bad/missing API key, network
-            # error, provider outage) propagated as an uncaught exception
-            # through pywebview's bridge -- the UI showed nothing spoken and
-            # nothing useful in text either, just a rejected-promise error in
-            # the browser console. Matches the try/except already around
-            # handle_wake()'s brain.respond() call in main.py.
-            logger.exception("brain.respond() failed for typed command %r", text)
-            reply = "Sorry, I ran into a problem answering that. Please check your AI provider settings and try again."
+        reply = respond_speaking(self.brain_holder.brain, text, self.speaker, _BRAIN_ERROR_REPLY)
         after = registry.call_count()
         tools = registry.get_recent_calls(after - before) if after > before else []
-        if self.speaker is not None:
-            self.speaker.say(reply)
         return {"reply": reply, "tools": tools}
 
     def trigger_listen(self) -> dict[str, Any]:
@@ -130,15 +122,9 @@ class JarvisAPI:
             return {"heard": "", "reply": "", "tools": []}
 
         before = registry.call_count()
-        try:
-            reply = self.brain_holder.brain.respond(text)
-        except Exception:
-            logger.exception("brain.respond() failed for orb command %r", text)
-            reply = "Sorry, I ran into a problem answering that. Please check your AI provider settings and try again."
+        reply = respond_speaking(self.brain_holder.brain, text, self.speaker, _BRAIN_ERROR_REPLY)
         after = registry.call_count()
         tools = registry.get_recent_calls(after - before) if after > before else []
-        if self.speaker is not None:
-            self.speaker.say(reply)
         return {"heard": text, "reply": reply, "tools": tools}
 
     def toggle_mute(self) -> bool:

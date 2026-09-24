@@ -143,7 +143,7 @@ class Speaker:
         self._ready.set()
 
         while True:
-            text = self._queue.get()
+            text, extra = self._coalesce(self._queue.get())
             try:
                 spoken = clean_for_speech(text)
                 if spoken:
@@ -152,7 +152,28 @@ class Speaker:
             except Exception:  # noqa: BLE001 - one bad utterance shouldn't kill the speech thread
                 logger.exception("TTS engine error")
             finally:
-                self._queue.task_done()
+                for _ in range(1 + extra):
+                    self._queue.task_done()
+
+    def _coalesce(self, first: str) -> tuple[str, int]:
+        """Streamed replies arrive as one sentence at a time. Local Windows
+        voices start instantly, so those are spoken one by one. An online
+        voice costs a network round trip per utterance, so sentences that
+        piled up while the previous one was playing are joined and sent as
+        one request -- one short pause instead of one between every
+        sentence. Returns (text, number of extra queue items consumed)."""
+        lang = detect_script_language(first)
+        if not (self._mode == "edge" or (self._mode == "auto" and lang is not None)):
+            return first, 0
+        parts, extra = [first], 0
+        while True:
+            with self._queue.mutex:
+                nxt = self._queue.queue[0] if self._queue.queue else None
+            if nxt is None or detect_script_language(nxt) != lang:
+                break
+            parts.append(self._queue.get_nowait())
+            extra += 1
+        return " ".join(parts), extra
 
     def _speak(self, engine, text: str) -> None:
         lang = detect_script_language(text)

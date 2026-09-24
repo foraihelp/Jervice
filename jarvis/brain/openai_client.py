@@ -11,10 +11,12 @@ from __future__ import annotations
 import json
 import logging
 import threading
+from typing import Callable, Optional
 
 from openai import OpenAI
 
 from jarvis.brain.memory import Memory
+from jarvis.brain.streaming import SentenceStreamer
 from jarvis.tools.registry import TOOL_SCHEMAS, run_tool
 
 logger = logging.getLogger("jarvis.brain")
@@ -61,50 +63,107 @@ class OpenAIBrain:
         # one shared conversation.
         self._lock = threading.Lock()
 
-    def respond(self, user_text: str) -> str:
+    def respond(self, user_text: str, on_sentence: Optional[Callable[[str], None]] = None) -> str:
+        """Returns the final reply. If `on_sentence` is given, the whole
+        reply is also delivered through it, one sentence at a time, while it
+        is still being generated -- the caller should speak those instead of
+        speaking the return value."""
         with self._lock:
-            return self._respond_locked(user_text)
+            return self._respond_locked(user_text, on_sentence)
 
-    def _respond_locked(self, user_text: str) -> str:
+    def _complete(self, messages: list[dict], streamer: Optional[SentenceStreamer]) -> tuple[str, list[dict]]:
+        """One model call. Returns (text, tool_calls) where each tool call is
+        {"id", "name", "arguments"}. Streams text through `streamer` when
+        given; if the endpoint rejects streaming outright (some
+        OpenAI-compatible servers do), quietly falls back to a plain call."""
+        kwargs = dict(model=self.model, max_tokens=self.max_tokens, messages=messages, tools=self._tools)
+
+        if streamer is not None:
+            text_parts: list[str] = []
+            calls: dict[int, dict] = {}
+            try:
+                for chunk in self._client.chat.completions.create(stream=True, **kwargs):
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
+                    if delta.content:
+                        text_parts.append(delta.content)
+                        streamer.feed(delta.content)
+                    for tc in delta.tool_calls or []:
+                        slot = calls.setdefault(tc.index, {"id": "", "name": "", "arguments": ""})
+                        if tc.id:
+                            slot["id"] = tc.id
+                        if tc.function:
+                            if tc.function.name and not slot["name"]:
+                                slot["name"] = tc.function.name
+                            if tc.function.arguments:
+                                slot["arguments"] += tc.function.arguments
+            except Exception:
+                if text_parts or calls:
+                    raise
+                logger.warning("Streaming request failed before any output; retrying without streaming.", exc_info=True)
+            else:
+                streamer.flush()
+                tool_calls = [
+                    {"id": c["id"] or f"call_{i}", "name": c["name"], "arguments": c["arguments"]}
+                    for i, c in sorted(calls.items())
+                ]
+                return "".join(text_parts).strip(), tool_calls
+
+        message = self._client.chat.completions.create(**kwargs).choices[0].message
+        tool_calls = [
+            {"id": tc.id, "name": tc.function.name, "arguments": tc.function.arguments}
+            for tc in message.tool_calls or []
+        ]
+        text = (message.content or "").strip()
+        if streamer is not None and text:
+            streamer.feed(text)
+            streamer.flush()
+        return text, tool_calls
+
+    def _respond_locked(self, user_text: str, on_sentence: Optional[Callable[[str], None]]) -> str:
+        streamer = SentenceStreamer(on_sentence) if on_sentence else None
         self.memory.add_message("user", user_text)
 
         for _ in range(MAX_TOOL_ITERATIONS):
             messages = [{"role": "system", "content": self.system_prompt}, *self.memory.recent_messages()]
-            response = self._client.chat.completions.create(
-                model=self.model,
-                max_tokens=self.max_tokens,
-                messages=messages,
-                tools=self._tools,
-            )
-            message = response.choices[0].message
+            text, tool_calls = self._complete(messages, streamer)
 
-            if not message.tool_calls:
-                text = (message.content or "").strip()
+            if not tool_calls:
                 self.memory.add_message("assistant", text)
                 self.memory.save()
-                return text or "Done."
+                if not text:
+                    text = "Done."
+                    if streamer:
+                        streamer.feed(text)
+                        streamer.flush()
+                return text
 
             self.memory.add_message(
                 "assistant",
-                content=message.content,
+                content=text or None,
                 tool_calls=[
                     {
-                        "id": tc.id,
+                        "id": tc["id"],
                         "type": "function",
-                        "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                        "function": {"name": tc["name"], "arguments": tc["arguments"]},
                     }
-                    for tc in message.tool_calls
+                    for tc in tool_calls
                 ],
             )
 
-            for tc in message.tool_calls:
+            for tc in tool_calls:
                 try:
-                    tool_input = json.loads(tc.function.arguments or "{}")
+                    tool_input = json.loads(tc["arguments"] or "{}")
                 except json.JSONDecodeError:
                     tool_input = {}
-                logger.info("Running tool %s(%s)", tc.function.name, tool_input)
-                result_text = run_tool(tc.function.name, tool_input)
-                self.memory.add_message("tool", content=result_text, tool_call_id=tc.id)
+                logger.info("Running tool %s(%s)", tc["name"], tool_input)
+                result_text = run_tool(tc["name"], tool_input)
+                self.memory.add_message("tool", content=result_text, tool_call_id=tc["id"])
 
         self.memory.save()
-        return "Sorry, that request needed too many steps -- can you break it down?"
+        message = "Sorry, that request needed too many steps -- can you break it down?"
+        if streamer:
+            streamer.feed(message)
+            streamer.flush()
+        return message
