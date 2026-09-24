@@ -119,7 +119,12 @@ class Speaker:
         # default (there's no supported API to change the Windows default
         # itself -- see jarvis/tools/system.py's get_default_output_device).
         self._output_device = output_device
-        self._queue: queue.Queue[str] = queue.Queue()
+        # Queue items are (generation, text). stop() bumps the generation,
+        # which makes everything queued or still streaming in from before
+        # the stop stale: the worker skips it instead of speaking it.
+        self._queue: queue.Queue[tuple[int, str]] = queue.Queue()
+        self._generation = 0
+        self._active_gen = 0
         self._engine = None
         self._base_voice = None
         self._ready = threading.Event()
@@ -140,13 +145,20 @@ class Speaker:
             self._pin_output_device(engine, self._output_device)
         self._base_voice = engine.getProperty("voice")
         self._engine = engine
+        # SAPI reports each word as it is spoken, on this thread. That is
+        # where a stop request is honored: pyttsx3's engine (a COM object)
+        # may only be touched from the thread that created it, so stop()
+        # can't call engine.stop() itself from another thread.
+        engine.connect("started-word", self._on_word)
         self._ready.set()
 
         while True:
-            text, extra = self._coalesce(self._queue.get())
+            gen, first = self._queue.get()
+            text, extra = self._coalesce(gen, first)
             try:
                 spoken = clean_for_speech(text)
-                if spoken:
+                if spoken and gen == self._generation:
+                    self._active_gen = gen
                     logger.info("Speaking: %r", spoken)
                     self._speak(engine, spoken)
             except Exception:  # noqa: BLE001 - one bad utterance shouldn't kill the speech thread
@@ -155,7 +167,11 @@ class Speaker:
                 for _ in range(1 + extra):
                     self._queue.task_done()
 
-    def _coalesce(self, first: str) -> tuple[str, int]:
+    def _on_word(self, name, location, length) -> None:
+        if self._active_gen != self._generation:
+            self._engine.stop()
+
+    def _coalesce(self, gen: int, first: str) -> tuple[str, int]:
         """Streamed replies arrive as one sentence at a time. Local Windows
         voices start instantly, so those are spoken one by one. An online
         voice costs a network round trip per utterance, so sentences that
@@ -169,9 +185,12 @@ class Speaker:
         while True:
             with self._queue.mutex:
                 nxt = self._queue.queue[0] if self._queue.queue else None
-            if nxt is None or detect_script_language(nxt) != lang:
+            if nxt is None or nxt[0] != gen or detect_script_language(nxt[1]) != lang:
                 break
-            parts.append(self._queue.get_nowait())
+            try:
+                parts.append(self._queue.get_nowait()[1])
+            except queue.Empty:  # stop() drained it between the peek and the get
+                break
             extra += 1
         return " ".join(parts), extra
 
@@ -237,6 +256,8 @@ class Speaker:
 
         audio = np.concatenate(pieces).astype(np.float32) / 32768.0 * float(self._volume)
         logger.info("Speaking via edge-tts voice %s", voice)
+        if self._active_gen != self._generation:  # stopped while the audio was being fetched
+            return
         sd.play(audio, samplerate=_EDGE_SAMPLE_RATE, device=resolve_device("output", self._output_device))
         sd.wait()
 
@@ -337,10 +358,35 @@ class Speaker:
             except Exception:
                 pass
 
-    def say(self, text: str) -> None:
+    @property
+    def generation(self) -> int:
+        """Changes every time stop() is called. A producer that streams text
+        in over time can remember it and stop feeding say() once it differs."""
+        return self._generation
+
+    def say(self, text: str, generation: int | None = None) -> None:
         if not text.strip():
             return
-        self._queue.put(text)
+        if generation is not None and generation != self._generation:
+            return  # produced before a stop(): drop it
+        self._queue.put((self._generation, text))
+
+    def stop(self) -> None:
+        """Cuts off the current speech and discards everything queued.
+        Safe to call from any thread. Speech queued afterwards is unaffected."""
+        self._generation += 1
+        while True:
+            try:
+                self._queue.get_nowait()
+            except queue.Empty:
+                break
+            self._queue.task_done()
+        try:
+            import sounddevice as sd
+
+            sd.stop()  # ends edge-tts playback; harmless if nothing is playing
+        except Exception:  # noqa: BLE001
+            logger.debug("sd.stop() failed", exc_info=True)
 
     def wait_until_idle(self, timeout: float | None = None) -> None:
         """Blocks until every say() call made so far has finished playing.

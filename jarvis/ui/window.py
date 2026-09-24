@@ -127,6 +127,12 @@ class JarvisAPI:
         tools = registry.get_recent_calls(after - before) if after > before else []
         return {"heard": text, "reply": reply, "tools": tools}
 
+    def stop_speaking(self) -> None:
+        """The Stop button: cuts off the reply being spoken, discards what's
+        queued, and abandons generation of the rest of it."""
+        if self.speaker is not None:
+            self.speaker.stop()
+
     def toggle_mute(self) -> bool:
         if self.tray is None:
             return False

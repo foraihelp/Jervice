@@ -55,17 +55,43 @@ class SentenceStreamer:
         self._buffer = buf[cut:]
 
 
+class SpeechCancelled(Exception):
+    """Raised inside a brain's streaming loop once the user has pressed Stop,
+    to abandon the rest of the reply (and close the connection to the model)
+    instead of generating text nobody will hear."""
+
+
 def respond_speaking(brain, text: str, speaker, error_reply: str) -> str:
     """Runs one brain turn, speaking the reply sentence by sentence as it is
     generated (or all at once for a brain that can't stream). Never raises: a
     brain failure is logged and `error_reply` is spoken and returned instead,
     so a bad API key or a network drop can't leave the user with silence.
-    Returns the full reply text for display."""
-    on_sentence: Optional[Callable[[str], None]] = speaker.say if speaker is not None else None
+    If the user presses Stop (Speaker.stop()) mid-reply, generation is
+    abandoned and only the part that was already spoken is returned.
+    Returns the reply text for display."""
+    if speaker is None:
+        try:
+            return brain.respond(text)
+        except Exception:  # noqa: BLE001
+            logger.exception("brain.respond() failed for %r", text)
+            return error_reply
+
+    generation = speaker.generation
+    delivered: list[str] = []
+
+    def on_sentence(sentence: str) -> None:
+        if speaker.generation != generation:
+            raise SpeechCancelled
+        delivered.append(sentence)
+        speaker.say(sentence, generation=generation)
+
     try:
         return brain.respond(text, on_sentence=on_sentence)
+    except SpeechCancelled:
+        logger.info("Reply stopped by the user.")
+        return " ".join(delivered + ["[stopped]"])
     except Exception:  # noqa: BLE001 - one bad turn must not kill the caller
         logger.exception("brain.respond() failed for %r", text)
-        if speaker is not None:
+        if speaker.generation == generation:
             speaker.say(error_reply)
         return error_reply

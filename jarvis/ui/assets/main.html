@@ -121,6 +121,8 @@
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="position:relative;"><path d="M12 3a3 3 0 013 3v6a3 3 0 01-6 0V6a3 3 0 013-3z" stroke="#04141C" stroke-width="1.8"/><path d="M6 11a6 6 0 0012 0M12 17v3" stroke="#04141C" stroke-width="1.8" stroke-linecap="round"/></svg>
         </div>
 
+        <svg id="stop-btn" class="icon-btn no-drag" width="20" height="20" viewBox="0 0 24 24" fill="none"><title>Stop speaking (Esc)</title><circle cx="12" cy="12" r="9" stroke="#E36B6B" stroke-width="1.5"/><rect x="8.5" y="8.5" width="7" height="7" rx="1" fill="#E36B6B"/></svg>
+
         <svg id="quit-btn" class="icon-btn" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3v10M6 13a6 6 0 0012 0" stroke="#8CA0B3" stroke-width="1.5" stroke-linecap="round"/></svg>
       </div>
     </main>
@@ -367,6 +369,14 @@
   document.getElementById('mute-btn').addEventListener('click', async () => {
     const isMuted = await window.pywebview.api.toggle_mute();
     setMuted(isMuted);
+  });
+
+  function stopSpeaking() {
+    window.pywebview.api.stop_speaking();
+  }
+  document.getElementById('stop-btn').addEventListener('click', stopSpeaking);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') stopSpeaking();
   });
 
   document.getElementById('settings-btn').addEventListener('click', () => {
