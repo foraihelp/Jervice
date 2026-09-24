@@ -48,7 +48,7 @@
 
   <div class="drag pywebview-drag-region" style="position:relative; height:52px; min-height:52px; display:flex; align-items:center; justify-content:space-between; padding:0 18px; border-bottom:1px solid rgba(120,190,255,0.12);">
     <div style="font-size:13px; font-weight:600; letter-spacing:0.14em;">SETTINGS</div>
-    <svg id="close-btn" class="no-drag" width="14" height="14" viewBox="0 0 24 24" fill="none" style="opacity:0.6; cursor:pointer;"><path d="M6 6l12 12M18 6L6 18" stroke="#8CA0B3" stroke-width="1.6" stroke-linecap="round"/></svg>
+    <svg id="close-btn" class="no-drag" data-tip="Close settings" width="14" height="14" viewBox="0 0 24 24" fill="none" style="opacity:0.6; cursor:pointer;"><path d="M6 6l12 12M18 6L6 18" stroke="#8CA0B3" stroke-width="1.6" stroke-linecap="round"/></svg>
   </div>
 
   <div style="position:relative; flex:1; overflow-y:auto; padding:26px 30px; display:flex; flex-direction:column; gap:26px;">
@@ -57,8 +57,8 @@
       <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">AI PROVIDER</div>
 
       <div style="display:flex; gap:10px; margin-bottom:14px;">
-        <div id="provider-anthropic" class="provider-option" style="flex:1; text-align:center; padding:10px; border-radius:8px; border:1px solid rgba(120,190,255,0.16); cursor:pointer; font-size:12.5px;">Claude</div>
-        <div id="provider-openai" class="provider-option" style="flex:1; text-align:center; padding:10px; border-radius:8px; border:1px solid rgba(120,190,255,0.16); cursor:pointer; font-size:12.5px;">OpenAI / Compatible</div>
+        <div id="provider-anthropic" class="provider-option" data-tip="Use Anthropic's Claude models" style="flex:1; text-align:center; padding:10px; border-radius:8px; border:1px solid rgba(120,190,255,0.16); cursor:pointer; font-size:12.5px;">Claude</div>
+        <div id="provider-openai" class="provider-option" data-tip="Use OpenAI, or any OpenAI-compatible service such as Groq, Together or a local Ollama" style="flex:1; text-align:center; padding:10px; border-radius:8px; border:1px solid rgba(120,190,255,0.16); cursor:pointer; font-size:12.5px;">OpenAI / Compatible</div>
       </div>
 
       <div style="font-size:11px; color:#56677A; margin-bottom:6px;">MODEL</div>
@@ -69,11 +69,11 @@
         <input id="base-url" type="text" placeholder="Leave blank for api.openai.com">
         <div style="font-size:11px; color:#4A5A6A; margin-top:6px; margin-bottom:10px;">Set this to use any OpenAI-compatible endpoint instead. Quick fill (still update the API key to match) &mdash; providers rename/retire models over time, so if the filled-in model 404s, check that provider's current model list:</div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <div class="preset-btn" data-url="" data-model="gpt-4o" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">OpenAI</div>
-          <div class="preset-btn" data-url="https://api.groq.com/openai/v1" data-model="openai/gpt-oss-120b" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">Groq</div>
-          <div class="preset-btn" data-url="https://api.together.xyz/v1" data-model="meta-llama/Llama-3.3-70B-Instruct-Turbo" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">Together</div>
-          <div class="preset-btn" data-url="https://openrouter.ai/api/v1" data-model="openai/gpt-4o" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">OpenRouter</div>
-          <div class="preset-btn" data-url="http://localhost:11434/v1" data-model="llama3.3" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">Local Ollama</div>
+          <div class="preset-btn" data-tip="Fill in this provider's web address and an example model" data-url="" data-model="gpt-4o" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">OpenAI</div>
+          <div class="preset-btn" data-tip="Fill in this provider's web address and an example model" data-url="https://api.groq.com/openai/v1" data-model="openai/gpt-oss-120b" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">Groq</div>
+          <div class="preset-btn" data-tip="Fill in this provider's web address and an example model" data-url="https://api.together.xyz/v1" data-model="meta-llama/Llama-3.3-70B-Instruct-Turbo" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">Together</div>
+          <div class="preset-btn" data-tip="Fill in this provider's web address and an example model" data-url="https://openrouter.ai/api/v1" data-model="openai/gpt-4o" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">OpenRouter</div>
+          <div class="preset-btn" data-tip="Fill in this provider's web address and an example model" data-url="http://localhost:11434/v1" data-model="llama3.3" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">Local Ollama</div>
         </div>
       </div>
 
@@ -88,7 +88,7 @@
       <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">MICROPHONE &amp; SPEAKER</div>
       <div style="display:flex; align-items:center; justify-content:space-between;">
         <div style="font-size:11px; color:#4A5A6A; max-width:340px;">Confirms both actually work, right now -- no need to go check Windows' Privacy &amp; security settings yourself.</div>
-        <div id="test-audio-btn" style="flex-shrink:0; text-align:center; padding:9px 16px; border-radius:8px; border:1px solid rgba(120,190,255,0.22); font-size:12px; color:#D7E2EA; cursor:pointer; white-space:nowrap;">Test Mic &amp; Speaker</div>
+        <div id="test-audio-btn" data-tip="Listens briefly to your microphone, then speaks a phrase, to confirm both work" style="flex-shrink:0; text-align:center; padding:9px 16px; border-radius:8px; border:1px solid rgba(120,190,255,0.22); font-size:12px; color:#D7E2EA; cursor:pointer; white-space:nowrap;">Test Mic &amp; Speaker</div>
       </div>
       <div id="test-audio-status" style="font-size:11px; margin-top:10px;"></div>
       <div style="margin-top:18px;">
@@ -107,7 +107,7 @@
           <div style="font-size:13px; color:#D7E2EA;">Sensitivity threshold</div>
           <div id="threshold-value" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6FE3FF;">0.50</div>
         </div>
-        <input id="threshold" type="range" min="0.1" max="0.9" step="0.05" value="0.5">
+        <input id="threshold" data-tip="Left: reacts to quieter or less clear speech (more false triggers). Right: stricter" type="range" min="0.1" max="0.9" step="0.05" value="0.5">
         <div style="display:flex; justify-content:space-between; margin-top:6px; font-family:'JetBrains Mono',monospace; font-size:9.5px; color:#4A5A6A;"><span>MORE SENSITIVE</span><span>FEWER FALSE TRIGGERS</span></div>
       </div>
     </div>
@@ -122,14 +122,14 @@
             <div style="font-size:13px; color:#D7E2EA;">Speaking rate</div>
             <div id="rate-value" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6FE3FF;">185 wpm</div>
           </div>
-          <input id="rate" type="range" min="120" max="260" step="5" value="185">
+          <input id="rate" data-tip="How fast Jarvis speaks, in words per minute" type="range" min="120" max="260" step="5" value="185">
         </div>
         <div style="flex:1;">
           <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
             <div style="font-size:13px; color:#D7E2EA;">Volume</div>
             <div id="volume-value" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6FE3FF;">100%</div>
           </div>
-          <input id="volume" type="range" min="0" max="100" step="5" value="100">
+          <input id="volume" data-tip="How loud Jarvis speaks" type="range" min="0" max="100" step="5" value="100">
         </div>
       </div>
       <div style="margin-top:18px;">
@@ -168,7 +168,7 @@
           <div style="font-size:13px; color:#D7E2EA;">Local API server</div>
           <div style="font-size:11px; color:#56677A; margin-top:2px;">Lets the iOS app reach this assistant</div>
         </div>
-        <div id="server-toggle" class="toggle on"><div class="knob"></div></div>
+        <div id="server-toggle" class="toggle on" data-tip="Turns the remote API on or off. It lets the phone app reach this assistant"><div class="knob"></div></div>
       </div>
 
       <div style="display:flex; gap:16px;">
@@ -186,11 +186,12 @@
   </div>
 
   <div style="position:relative; padding:16px 30px 22px;">
-    <div id="save-btn" style="text-align:center; padding:12px; border-radius:10px; background:oklch(78% 0.14 200); color:#04141C; font-weight:600; font-size:14px; box-shadow:0 0 22px rgba(111,227,255,0.35);">Save</div>
+    <div id="save-btn" data-tip="Save all changes" style="text-align:center; padding:12px; border-radius:10px; background:oklch(78% 0.14 200); color:#04141C; font-weight:600; font-size:14px; box-shadow:0 0 22px rgba(111,227,255,0.35);">Save</div>
     <div id="save-status"></div>
   </div>
 </div>
 
+<script src="tooltips.js"></script>
 <script>
   // See main.html for why this is needed: pywebview's Windows backend
   // drags frameless windows via its own '.pywebview-drag-region' class
