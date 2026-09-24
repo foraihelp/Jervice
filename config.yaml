@@ -16,6 +16,13 @@ recording:
   # normal speech is usually 1000+. Lower this if Jarvis cuts you off too
   # early; raise it if it keeps recording through background noise.
   silence_rms_threshold: 400
+  # Microphone to record from: a substring of its name (e.g. "Microphone" for
+  # the PC's own mic), or blank for the Windows default. Tip: with a
+  # Bluetooth headset, using the PC/USB mic here and the headset for output
+  # only keeps the headset in stereo quality -- Windows drops it to a
+  # low-quality mono "call" mode whenever the headset's own mic is in use.
+  # Easiest to set from Settings (gear icon).
+  input_device: ""
 
 stt:
   # faster-whisper model size: tiny, base, small, medium, large-v3
@@ -31,6 +38,11 @@ tts:
   # Leave blank to use the system default voice. To list available voices,
   # run: python -m jarvis.audio.tts --list-voices
   voice_id: ""
+  # Who speaks: "auto" = Windows voices, plus Microsoft's online neural
+  # voices (via edge-tts, needs internet, no key) for Hindi/Bengali replies
+  # since Windows doesn't ship those voices; "sapi" = Windows voices only,
+  # fully offline; "edge" = online neural voices for everything.
+  engine: "auto"
   # Pins Jarvis's own speech to a specific playback device, independent of
   # whatever Windows currently considers the "default" output -- useful
   # because a paired-but-disconnected Bluetooth headset can stay the

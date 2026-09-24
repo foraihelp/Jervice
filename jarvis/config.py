@@ -84,6 +84,20 @@ class Config:
         return self.raw["tts"].get("voice_id", "") or ""
 
     @property
+    def tts_engine(self) -> str:
+        """"auto" (Windows voices, plus Microsoft's online neural voices for
+        Hindi/Bengali replies), "sapi" (Windows voices only, fully offline),
+        or "edge" (online neural voices for everything)."""
+        value = (self.raw["tts"].get("engine", "auto") or "auto").strip().lower()
+        return value if value in ("auto", "sapi", "edge") else "auto"
+
+    @property
+    def input_device(self) -> str:
+        """Substring of the microphone's name to record from; empty = system
+        default. See jarvis/audio/devices.py."""
+        return (self.raw["recording"].get("input_device", "") or "").strip()
+
+    @property
     def tts_output_device(self) -> str:
         """Substring to match against a SAPI5 audio output device name (see
         jarvis/audio/tts.py's Speaker). Empty = system default."""
@@ -253,6 +267,8 @@ def save_settings(payload: dict[str, Any]) -> None:
     tts_rate (int), tts_volume (float 0-1), tts_output_device (str,
     substring of a SAPI5 device name, blank = system default),
     reply_language (str, "" / "english" / "hindi" / "bengali"),
+    tts_engine ("auto" / "sapi" / "edge"), input_device (str, microphone
+    name substring, blank = system default),
     server_enabled (bool),
     server_port (int), api_token (str, written to .env not config.yaml),
     provider ("anthropic" or "openai"), model (str), base_url (str, only
@@ -277,6 +293,10 @@ def save_settings(payload: dict[str, Any]) -> None:
         data["tts"]["volume"] = float(payload["tts_volume"])
     if "tts_output_device" in payload:
         data["tts"]["output_device"] = (payload["tts_output_device"] or "").strip()
+    if "input_device" in payload:
+        data.setdefault("recording", {})["input_device"] = (payload["input_device"] or "").strip()
+    if payload.get("tts_engine") in ("auto", "sapi", "edge"):
+        data["tts"]["engine"] = payload["tts_engine"]
     if "reply_language" in payload:
         data.setdefault("brain", {})["reply_language"] = (payload["reply_language"] or "").strip().lower()
     if "server_enabled" in payload:

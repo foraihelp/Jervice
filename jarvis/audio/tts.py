@@ -1,4 +1,5 @@
-"""Local text-to-speech via pyttsx3 (wraps Windows SAPI5 voices).
+"""Text-to-speech: Windows SAPI5 voices via pyttsx3 (offline), plus optional
+Microsoft neural voices via edge-tts (online, no API key) for Hindi/Bengali.
 
 Run `python -m jarvis.audio.tts --list-voices` to see installed voice IDs
 you can set in config.yaml under tts.voice_id.
@@ -9,6 +10,7 @@ from __future__ import annotations
 import argparse
 import logging
 import queue
+import re
 import threading
 
 logger = logging.getLogger("jarvis.tts")
@@ -19,6 +21,45 @@ logger = logging.getLogger("jarvis.tts")
 # An English SAPI5 voice reading Hindi/Bengali script produces garbage, not
 # a graceful approximation, so this match is required, not cosmetic.
 LANGUAGE_LOCALE_PREFIXES = {"english": "en", "hindi": "hi", "bengali": "bn"}
+
+_EDGE_VOICES = {
+    "english": "en-IN-NeerjaNeural",
+    "hindi": "hi-IN-SwaraNeural",
+    "bengali": "bn-IN-TanishaaNeural",
+}
+_EDGE_SAMPLE_RATE = 24000
+_EDGE_TIMEOUT_SECONDS = 20
+
+
+def clean_for_speech(text: str) -> str:
+    """Strips markdown and other visual-only formatting so it isn't read
+    aloud ("asterisk asterisk Weather"). The on-screen transcript keeps the
+    original text; only what gets spoken is cleaned."""
+    t = re.sub(r"```.*?```", " ", text, flags=re.S)
+    t = re.sub(r"`([^`]*)`", r"\1", t)
+    t = re.sub(r"!?\[([^\]]*)\]\([^)]*\)", r"\1", t)
+    t = re.sub(r"https?://\S+", " ", t)
+    t = re.sub(r"^\s{0,3}#{1,6}\s*", "", t, flags=re.M)
+    t = re.sub(r"^\s*[-*•+]\s+", "", t, flags=re.M)
+    t = re.sub(r"(\*\*|__|\*|~~)", "", t)
+    t = t.replace("|", ", ")
+    t = t.replace(" ", " ").replace(" ", " ").replace("​", "")
+    # A line break with no punctuation before it becomes a sentence pause,
+    # so list items and headings don't run together into one long sentence.
+    t = re.sub(r"(?<![.!?:;,\s।])[ \t]*\n+\s*", ". ", t)
+    t = re.sub(r"\s*\n+\s*", " ", t)
+    return re.sub(r"[ \t]{2,}", " ", t).strip()
+
+
+def detect_script_language(text: str) -> str | None:
+    """"hindi" / "bengali" if the text is (mostly) written in Devanagari /
+    Bengali script, else None -- lets the speaker route non-Latin replies to
+    a voice that can pronounce them regardless of the Settings language."""
+    devanagari = sum(1 for c in text if "ऀ" <= c <= "ॿ")
+    bengali = sum(1 for c in text if "ঀ" <= c <= "৿")
+    if max(devanagari, bengali) < 3:
+        return None
+    return "hindi" if devanagari >= bengali else "bengali"
 
 
 class Speaker:
@@ -40,9 +81,23 @@ class Speaker:
     spoken from either of those two paths. Routing every caller through
     this queue means the actual pyttsx3 engine is only ever touched by the
     one thread that created it, regardless of which thread calls say().
+
+    `engine_mode` picks who speaks: "sapi" (Windows voices only), "edge"
+    (Microsoft neural voices for everything, needs internet), or "auto"
+    (default: SAPI, except Hindi/Bengali-script replies go to edge-tts since
+    Windows doesn't ship voices for those). If edge-tts fails (offline),
+    it falls back to a matching installed SAPI voice.
     """
 
-    def __init__(self, rate: int, volume: float, voice_id: str = "", output_device: str = "", language: str = ""):
+    def __init__(
+        self,
+        rate: int,
+        volume: float,
+        voice_id: str = "",
+        output_device: str = "",
+        language: str = "",
+        engine_mode: str = "auto",
+    ):
         self._rate = rate
         self._volume = volume
         self._voice_id = voice_id
@@ -51,6 +106,8 @@ class Speaker:
         # explicitly set), overrides voice_id with an installed voice
         # matching this language -- see _auto_select_voice_for_language.
         self._language = (language or "").strip().lower()
+        mode = (engine_mode or "auto").strip().lower()
+        self._mode = mode if mode in ("auto", "sapi", "edge") else "auto"
         # Substring match (case-insensitive) against a SAPI5 audio output
         # device name, e.g. "Realtek" or "BenQ". Empty = leave it on
         # whatever Windows' system-wide default output is. Pinning this
@@ -64,6 +121,7 @@ class Speaker:
         self._output_device = output_device
         self._queue: queue.Queue[str] = queue.Queue()
         self._engine = None
+        self._base_voice = None
         self._ready = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
@@ -76,23 +134,90 @@ class Speaker:
         engine.setProperty("volume", self._volume)
         if self._voice_id:
             engine.setProperty("voice", self._voice_id)
-        elif self._language:
+        elif self._language and (self._mode == "sapi" or self._language == "english"):
             self._auto_select_voice_for_language(engine, self._language)
         if self._output_device:
             self._pin_output_device(engine, self._output_device)
+        self._base_voice = engine.getProperty("voice")
         self._engine = engine
         self._ready.set()
 
         while True:
             text = self._queue.get()
             try:
-                logger.info("Speaking: %r", text)
-                engine.say(text)
-                engine.runAndWait()
+                spoken = clean_for_speech(text)
+                if spoken:
+                    logger.info("Speaking: %r", spoken)
+                    self._speak(engine, spoken)
             except Exception:  # noqa: BLE001 - one bad utterance shouldn't kill the speech thread
                 logger.exception("TTS engine error")
             finally:
                 self._queue.task_done()
+
+    def _speak(self, engine, text: str) -> None:
+        lang = detect_script_language(text)
+        if self._mode == "edge" or (self._mode == "auto" and lang is not None):
+            try:
+                self._speak_edge(text, lang)
+                return
+            except Exception as exc:  # noqa: BLE001 - offline / service hiccup: fall back to a local voice
+                logger.warning("edge-tts failed (%s); falling back to a local Windows voice.", exc)
+        self._speak_sapi(engine, text, lang)
+
+    def _speak_sapi(self, engine, text: str, lang: str | None) -> None:
+        if lang:
+            voice_id = self._match_voice(engine.getProperty("voices"), lang, LANGUAGE_LOCALE_PREFIXES[lang])
+            if not voice_id:
+                logger.warning("No installed Windows voice can speak %s and the online voice is unavailable; skipping speech.", lang)
+                return
+            engine.setProperty("voice", voice_id)
+        try:
+            engine.say(text)
+            engine.runAndWait()
+        finally:
+            if lang and self._base_voice:
+                engine.setProperty("voice", self._base_voice)
+
+    def _speak_edge(self, text: str, lang: str | None) -> None:
+        import asyncio
+        import io
+
+        import av
+        import edge_tts
+        import numpy as np
+        import sounddevice as sd
+
+        from jarvis.audio.devices import resolve_device
+
+        voice = _EDGE_VOICES[lang or "english"]
+        percent = max(-50, min(100, round((self._rate / 200 - 1) * 100)))
+
+        async def fetch() -> bytes:
+            data = bytearray()
+            async for chunk in edge_tts.Communicate(text, voice, rate=f"{percent:+d}%").stream():
+                if chunk["type"] == "audio":
+                    data += chunk["data"]
+            return bytes(data)
+
+        mp3 = asyncio.run(asyncio.wait_for(fetch(), timeout=_EDGE_TIMEOUT_SECONDS))
+        if not mp3:
+            raise RuntimeError("edge-tts returned no audio")
+
+        resampler = av.AudioResampler(format="s16", layout="mono", rate=_EDGE_SAMPLE_RATE)
+        pieces = []
+        with av.open(io.BytesIO(mp3)) as container:
+            for frame in container.decode(audio=0):
+                for out in resampler.resample(frame):
+                    pieces.append(out.to_ndarray().reshape(-1))
+        for out in resampler.resample(None):
+            pieces.append(out.to_ndarray().reshape(-1))
+        if not pieces:
+            raise RuntimeError("edge-tts audio could not be decoded")
+
+        audio = np.concatenate(pieces).astype(np.float32) / 32768.0 * float(self._volume)
+        logger.info("Speaking via edge-tts voice %s", voice)
+        sd.play(audio, samplerate=_EDGE_SAMPLE_RATE, device=resolve_device("output", self._output_device))
+        sd.wait()
 
     def _auto_select_voice_for_language(self, engine, language: str) -> None:
         """Picks an installed SAPI5 voice that can actually speak

@@ -42,3 +42,7 @@ comtypes>=1.4.5; sys_platform == "win32"   # required by pycaw
 # answer" API is effectively dead for real queries, so this scrapes actual
 # search results instead. Pulls in lxml + primp (a Rust HTTP client).
 ddgs>=9.0
+
+# Microsoft neural voices for Hindi/Bengali speech (jarvis/audio/tts.py). No API key needed;
+# audio is decoded with PyAV, which faster-whisper already pulls in.
+edge-tts>=7.0

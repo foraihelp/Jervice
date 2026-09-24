@@ -17,6 +17,7 @@ import logging
 import numpy as np
 import sounddevice as sd
 
+from jarvis.audio.devices import resolve_device
 from jarvis.audio.errors import MIC_HELP_TEXT, MicrophoneError
 
 logger = logging.getLogger("jarvis.recorder")
@@ -24,7 +25,7 @@ logger = logging.getLogger("jarvis.recorder")
 FRAME_MS = 30  # size of each analysis chunk
 
 
-def test_microphone() -> None:
+def test_microphone(input_device: str = "") -> None:
     """Briefly opens (and immediately closes) an input stream purely to
     confirm the microphone is actually reachable -- used by Settings'
     "Test Microphone & Speaker" button so the user gets a real yes/no
@@ -33,7 +34,10 @@ def test_microphone() -> None:
     (with the same actionable message record_command() uses) on failure;
     returns normally on success."""
     try:
-        stream = sd.InputStream(samplerate=16000, channels=1, dtype="int16", blocksize=1600)
+        stream = sd.InputStream(
+            device=resolve_device("input", input_device),
+            samplerate=16000, channels=1, dtype="int16", blocksize=1600,
+        )
         stream.start()
         stream.stop()
         stream.close()
@@ -47,6 +51,7 @@ def record_command(
     silence_seconds: float,
     max_seconds: float,
     silence_rms_threshold: float = 400.0,
+    input_device: str = "",
 ) -> np.ndarray:
     """Records mono int16 audio from the default microphone until the user
     stops talking (RMS-detected silence) or `max_seconds` is reached.
@@ -77,6 +82,7 @@ def record_command(
     logger.info("Recording command...")
     try:
         stream = sd.InputStream(
+            device=resolve_device("input", input_device),
             samplerate=sample_rate,
             channels=1,
             dtype="int16",

@@ -23,6 +23,10 @@ pyinstaller ^
   --collect-all ddgs ^
   --collect-all primp ^
   --collect-all lxml ^
+  --collect-all edge_tts ^
+  --collect-all aiohttp ^
+  --collect-all certifi ^
+  --collect-all av ^
   --hidden-import pyttsx3.drivers ^
   --hidden-import pyttsx3.drivers.sapi5 ^
   --hidden-import win32timezone ^

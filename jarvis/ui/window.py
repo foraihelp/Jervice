@@ -120,6 +120,7 @@ class JarvisAPI:
                 silence_seconds=self.config.silence_seconds,
                 max_seconds=self.config.max_record_seconds,
                 silence_rms_threshold=self.config.silence_rms_threshold,
+                input_device=self.config.input_device,
             )
         finally:
             if self.wake_word_listener is not None:
@@ -188,6 +189,8 @@ class SettingsAPI:
             "tts_volume": self.config.tts_volume,
             "tts_output_device": self.config.tts_output_device,
             "reply_language": self.config.reply_language,
+            "tts_engine": self.config.tts_engine,
+            "input_device": self.config.input_device,
             "server_enabled": self.config.server_enabled,
             "server_port": self.config.server_port,
             "api_token": self.config.api_token,
@@ -210,6 +213,16 @@ class SettingsAPI:
             return Speaker.list_output_devices()
         except Exception:
             logger.exception("Could not enumerate audio output devices")
+            return []
+
+    def list_audio_input_devices(self) -> list[str]:
+        """Microphones PortAudio can see, for the microphone picker."""
+        from jarvis.audio.devices import list_devices
+
+        try:
+            return list_devices("input")
+        except Exception:
+            logger.exception("Could not enumerate audio input devices")
             return []
 
     def check_voice_for_language(self, language: str) -> bool:
@@ -259,7 +272,7 @@ class SettingsAPI:
         if self.wake_word_listener is not None:
             self.wake_word_listener.pause()
         try:
-            test_microphone()
+            test_microphone(self.config.input_device)
         except MicrophoneError as exc:
             return {"ok": False, "message": str(exc)}
         finally:

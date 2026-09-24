@@ -140,6 +140,7 @@ def main() -> None:
         voice_id=config.tts_voice_id,
         output_device=config.tts_output_device,
         language=config.reply_language,
+        engine_mode=config.tts_engine,
     )
     transcriber = Transcriber(
         model_size=config.stt_model_size,
@@ -170,7 +171,9 @@ def main() -> None:
     # (the orb click, in jarvis/ui/window.py) can also pause/resume it --
     # both that path and the wake-word-triggered one record a command via
     # the same microphone, and only one of them can have it open at a time.
-    wake_word_listener = WakeWordListener(config.wake_word_model, config.wake_word_threshold)
+    wake_word_listener = WakeWordListener(
+        config.wake_word_model, config.wake_word_threshold, input_device=config.input_device
+    )
 
     window = create_main_window(brain_holder, transcriber, config, tray, wake_word_listener, speaker)
     window_holder["window"] = window
@@ -217,6 +220,7 @@ def main() -> None:
                 silence_seconds=config.silence_seconds,
                 max_seconds=config.max_record_seconds,
                 silence_rms_threshold=config.silence_rms_threshold,
+                input_device=config.input_device,
             )
         except MicrophoneError as exc:
             # Not caught, this would kill the wake-word background thread

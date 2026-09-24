@@ -14,6 +14,7 @@ from typing import Callable, Optional
 import numpy as np
 import sounddevice as sd
 
+from jarvis.audio.devices import resolve_device
 from jarvis.audio.errors import MIC_HELP_TEXT, MicrophoneError
 
 logger = logging.getLogger("jarvis.wake_word")
@@ -39,12 +40,13 @@ class WakeWordListener:
     orb click in jarvis/ui/window.py) needs to call them itself.
     """
 
-    def __init__(self, model_name: str, threshold: float):
+    def __init__(self, model_name: str, threshold: float, input_device: str = ""):
         # Imported lazily so the rest of the app can be imported/tested
         # without openwakeword (and its model download) being present.
         from openwakeword.model import Model
 
         self.threshold = threshold
+        self.input_device = input_device
         self.model_name = model_name
         try:
             self._model = Model(wakeword_models=[model_name])
@@ -63,6 +65,7 @@ class WakeWordListener:
 
     def _open_stream(self) -> sd.InputStream:
         stream = sd.InputStream(
+            device=resolve_device("input", self.input_device),
             samplerate=SAMPLE_RATE,
             channels=1,
             dtype="int16",
