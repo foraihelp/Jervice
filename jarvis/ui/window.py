@@ -151,7 +151,10 @@ class JarvisAPI:
             self.window.hide()
 
     def open_settings(self) -> None:
-        open_settings_window(self.config, self.brain_holder, wake_word_listener=self.wake_word_listener, speaker=self.speaker)
+        open_settings_window(
+            self.config, self.brain_holder, wake_word_listener=self.wake_word_listener,
+            speaker=self.speaker, transcriber=self.transcriber,
+        )
 
     def quit(self) -> None:
         logger.info("Quit requested from main window.")
@@ -167,11 +170,12 @@ class SettingsAPI:
     # immediately instead of needing a full restart.
     _BRAIN_AFFECTING_KEYS = {"provider", "model", "base_url", "api_key", "reply_language"}
 
-    def __init__(self, config, brain_holder, wake_word_listener=None, speaker=None):
+    def __init__(self, config, brain_holder, wake_word_listener=None, speaker=None, transcriber=None):
         self.config = config
         self.brain_holder = brain_holder
         self.wake_word_listener = wake_word_listener
         self.speaker = speaker
+        self.transcriber = transcriber
         self.window = None  # set by open_settings_window() right after the window exists
 
     def get_settings(self) -> dict[str, Any]:
@@ -181,6 +185,8 @@ class SettingsAPI:
             "tts_volume": self.config.tts_volume,
             "tts_output_device": self.config.tts_output_device,
             "reply_language": self.config.reply_language,
+            "stt_language": self.config.stt_language,
+            "stt_engine": self.config.stt_engine,
             "follow_up_seconds": self.config.follow_up_seconds,
             "confirm_risky": self.config.confirm_risky,
             "tts_engine": self.config.tts_engine,
@@ -237,6 +243,8 @@ class SettingsAPI:
 
         save_settings(payload)
         self.config = load_config()
+        if self.transcriber is not None:
+            self.transcriber.apply_config(self.config)  # speech language/engine apply immediately
         if "confirm_risky" in payload:
             from jarvis.tools import safety
 
@@ -334,7 +342,7 @@ def create_main_window(brain_holder, transcriber, config, tray, wake_word_listen
     return window
 
 
-def open_settings_window(config, brain_holder, wake_word_listener=None, speaker=None) -> None:
+def open_settings_window(config, brain_holder, wake_word_listener=None, speaker=None, transcriber=None) -> None:
     """Opens the settings window, or re-focuses it if already open."""
     global _settings_window
 
@@ -348,7 +356,7 @@ def open_settings_window(config, brain_holder, wake_word_listener=None, speaker=
 
     import webview
 
-    api = SettingsAPI(config, brain_holder, wake_word_listener=wake_word_listener, speaker=speaker)
+    api = SettingsAPI(config, brain_holder, wake_word_listener=wake_word_listener, speaker=speaker, transcriber=transcriber)
     window = webview.create_window(
         "Jarvis Settings",
         str(ASSETS_DIR / "settings.html"),

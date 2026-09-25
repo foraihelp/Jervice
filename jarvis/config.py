@@ -143,6 +143,25 @@ class Config:
         return (self.raw["brain"].get("reply_language", "") or "").strip().lower()
 
     @property
+    def stt_language(self) -> str:
+        """Language the user speaks: "en", "hi", "bn", or "auto"."""
+        value = (self.raw["stt"].get("language", "en") or "en").strip().lower()
+        return value if value in ("en", "hi", "bn", "auto") else "en"
+
+    @property
+    def stt_engine(self) -> str:
+        """"local" (on this PC, private) or "cloud" (the AI provider's hosted Whisper)."""
+        value = (self.raw["stt"].get("engine", "local") or "local").strip().lower()
+        return value if value in ("local", "cloud") else "local"
+
+    @property
+    def stt_cloud_model(self) -> str:
+        override = (self.raw["stt"].get("cloud_model", "") or "").strip()
+        if override:
+            return override
+        return "whisper-large-v3-turbo" if "groq" in self.brain_base_url.lower() else "whisper-1"
+
+    @property
     def follow_up_seconds(self) -> float:
         """After answering a wake-word command, how long Jarvis keeps listening
         for a follow-up without the wake word. 0 turns it off."""
@@ -289,6 +308,7 @@ def save_settings(payload: dict[str, Any]) -> None:
     tts_rate (int), tts_volume (float 0-1), tts_output_device (str,
     substring of a SAPI5 device name, blank = system default),
     reply_language (str, "" / "english" / "hindi" / "bengali"),
+    stt_language ("en"/"hi"/"bn"/"auto"), stt_engine ("local"/"cloud"),
     follow_up_seconds (number, 0 = off), confirm_risky (bool),
     tts_engine ("auto" / "sapi" / "edge"), input_device (str, microphone
     name substring, blank = system default),
@@ -320,6 +340,10 @@ def save_settings(payload: dict[str, Any]) -> None:
         data.setdefault("recording", {})["input_device"] = (payload["input_device"] or "").strip()
     if payload.get("tts_engine") in ("auto", "sapi", "edge"):
         data["tts"]["engine"] = payload["tts_engine"]
+    if payload.get("stt_language") in ("en", "hi", "bn", "auto"):
+        data["stt"]["language"] = payload["stt_language"]
+    if payload.get("stt_engine") in ("local", "cloud"):
+        data["stt"]["engine"] = payload["stt_engine"]
     if "follow_up_seconds" in payload:
         data.setdefault("conversation", {})["follow_up_seconds"] = max(0, min(30, float(payload["follow_up_seconds"])))
     if "confirm_risky" in payload:

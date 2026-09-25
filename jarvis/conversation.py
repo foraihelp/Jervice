@@ -29,12 +29,20 @@ _DISMISSALS = {
     "thanks", "thank you", "thanks jarvis", "thank you jarvis", "thats all", "that is all", "thats it",
     "no thanks", "nothing", "nothing else", "never mind", "nevermind", "goodbye", "bye", "stop", "cancel",
     "okay thanks", "ok thanks", "ok thank you", "okay thank you", "no", "nope",
+    # Hindi
+    "धन्यवाद", "शुक्रिया", "थैंक्स", "थैंक यू", "बस", "बस इतना ही", "बस इतना", "कुछ नहीं", "नहीं", "रहने दो", "अलविदा",
+    # Bengali
+    "ধন্যবাদ", "থ্যাংক ইউ", "থ্যাঙ্ক ইউ", "থ্যাংকস", "ব্যাস", "আর কিছু না", "কিছু না", "না", "থাক", "বিদায়",
 }
 
 
 def is_dismissal(text: str) -> bool:
     """True when the user is just ending the conversation ("thanks", "that's all")."""
-    cleaned = re.sub(r"[^\w\s]", "", text.lower().replace("’", "").replace("'", "")).strip()
+    # Devanagari/Bengali vowel signs aren't "word" characters to \w, so those ranges are kept
+    # explicitly (minus the danda, the full stop of those scripts).
+    cleaned = re.sub(
+        r"[^\w\sऀ-ॣ०-ॿঀ-৿]", "", text.lower().replace("’", "").replace("'", "")
+    ).strip()
     return cleaned in _DISMISSALS
 
 

@@ -149,6 +149,7 @@ def main() -> None:
         device=config.stt_device,
         compute_type=config.stt_compute_type,
     )
+    transcriber.apply_config(config)
 
     # window_holder lets the tray's "Show Jarvis" callback reach the window
     # object even though the window is created after the tray (TrayApp
@@ -193,7 +194,9 @@ def main() -> None:
                 "icon, bottom of the left rail) to get started -- you can "
                 "also switch AI providers there.",
             )
-            open_settings_window(config, brain_holder, wake_word_listener=wake_word_listener, speaker=speaker)
+            open_settings_window(
+                config, brain_holder, wake_word_listener=wake_word_listener, speaker=speaker, transcriber=transcriber
+            )
 
         try:
             window.events.loaded += _prompt_for_api_key

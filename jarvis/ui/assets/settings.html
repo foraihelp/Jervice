@@ -96,6 +96,24 @@
         <select id="input-device"><option value="">System default</option></select>
         <div style="font-size:11px; color:#4A5A6A; margin-top:6px;">Using a Bluetooth headset? Windows drops it to low-quality mono "call" mode whenever its own mic is in use, and Jarvis listens for the wake word continuously. For best sound, pick your PC/USB microphone here and keep the headset for output only (Output Device below). Requires a restart to apply.</div>
       </div>
+      <div style="margin-top:18px;">
+        <div style="font-size:11px; color:#56677A; margin-bottom:6px;">SPEECH LANGUAGE (WHAT YOU SPEAK)</div>
+        <select id="stt-language" data-tip="The language Jarvis should expect when you talk to it">
+          <option value="en">English</option>
+          <option value="hi">Hindi</option>
+          <option value="bn">Bengali</option>
+          <option value="auto">Auto-detect (less reliable)</option>
+        </select>
+        <div style="font-size:11px; color:#4A5A6A; margin-top:6px;">Applies immediately. The wake phrase stays "Hey Jarvis". A fixed language is much more reliable than auto-detect, which often mistakes Bengali for Hindi.</div>
+      </div>
+      <div style="margin-top:18px;">
+        <div style="font-size:11px; color:#56677A; margin-bottom:6px;">SPEECH RECOGNITION</div>
+        <select id="stt-engine" data-tip="Where your voice is turned into text">
+          <option value="local">On this PC (private, works offline)</option>
+          <option value="cloud">Cloud, via your AI provider (more accurate)</option>
+        </select>
+        <div id="stt-status" style="font-size:11px; color:#4A5A6A; margin-top:6px;"></div>
+      </div>
     </div>
 
     <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
@@ -260,6 +278,7 @@
       $('api-key').value = lastKnownKey[p] || '';
     }
     refreshKeyStatus();
+    if (typeof refreshSttStatus === 'function') refreshSttStatus();
   }
 
   function refreshKeyStatus() {
@@ -319,6 +338,28 @@
     }
   }
   $('reply-language').addEventListener('change', refreshLanguageStatus);
+
+  function refreshSttStatus() {
+    const lang = $('stt-language').value;
+    const cloud = $('stt-engine').value === 'cloud';
+    const el = $('stt-status');
+    el.style.color = '#4A5A6A';
+    if (cloud && provider !== 'openai') {
+      el.textContent = 'Cloud recognition needs an OpenAI-compatible AI provider such as Groq. Claude cannot transcribe speech, so Jarvis will use this PC instead.';
+      el.style.color = '#FFB454';
+    } else if (cloud) {
+      el.textContent = 'Each voice recording is uploaded to your AI provider (Groq or OpenAI) to be transcribed. If that fails, Jarvis falls back to this PC.';
+    } else if (lang === 'bn') {
+      el.textContent = 'Bengali is recognised poorly on this PC (it often writes Bengali in Devanagari letters). Cloud is strongly recommended for Bengali.';
+      el.style.color = '#FFB454';
+    } else if (lang === 'hi' || lang === 'auto') {
+      el.textContent = 'Hindi works on this PC but makes more mistakes than Cloud. Everything stays private and offline.';
+    } else {
+      el.textContent = 'Nothing leaves this PC. Applies immediately.';
+    }
+  }
+  $('stt-language').addEventListener('change', refreshSttStatus);
+  $('stt-engine').addEventListener('change', refreshSttStatus);
   $('tts-engine').addEventListener('change', refreshLanguageStatus);
 
   async function loadInputDevices(selected) {
@@ -389,6 +430,8 @@
       loadOutputDevices(s.tts_output_device || '');
       loadInputDevices(s.input_device || '');
       $('tts-engine').value = s.tts_engine || 'auto';
+      $('stt-language').value = s.stt_language || 'en';
+      $('stt-engine').value = s.stt_engine || 'local';
       $('reply-language').value = s.reply_language || '';
       const fu = String(Math.round(s.follow_up_seconds));
       if (!Array.from($('follow-up').options).some((o) => o.value === fu)) {
@@ -409,6 +452,7 @@
       $('model').value = s.model || '';
       $('api-key').value = lastKnownKey[s.provider === 'openai' ? 'openai' : 'anthropic'];
       selectProvider(s.provider === 'openai' ? 'openai' : 'anthropic', { keepFields: true });
+      refreshSttStatus();
     } catch (e) {
       $('save-status').textContent = 'Could not load settings: ' + e;
     }
@@ -423,6 +467,8 @@
         tts_volume: parseInt($('volume').value, 10) / 100,
         tts_output_device: $('output-device').value,
         reply_language: $('reply-language').value,
+        stt_language: $('stt-language').value,
+        stt_engine: $('stt-engine').value,
         follow_up_seconds: parseFloat($('follow-up').value),
         confirm_risky: confirmRisky,
         tts_engine: $('tts-engine').value,
@@ -436,8 +482,8 @@
         api_key: $('api-key').value,
       });
       $('save-status').textContent = result && result.applied_live
-        ? 'Saved. AI provider / output language change is live now -- try a command. (Voice/output-device selection, wake word, and remote-server changes still need a restart.)'
-        : 'Saved. Restart Jarvis for wake word / voice / remote-server changes to fully apply.';
+        ? 'Saved. AI provider, reply language and speech recognition apply now -- try a command. (Voice, microphone, output device, wake word and remote-server changes still need a restart.)'
+        : 'Saved. Speech language and recognition apply now. Restart Jarvis for voice, microphone, output device, wake word and remote-server changes.';
     } catch (e) {
       $('save-status').textContent = 'Error saving: ' + e;
     }

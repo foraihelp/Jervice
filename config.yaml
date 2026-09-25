@@ -31,6 +31,14 @@ stt:
   model_size: "small"
   device: "cpu"            # set to "cuda" if you have an NVIDIA GPU + CUDA installed
   compute_type: "int8"     # int8 is fast on CPU; use "float16" on GPU
+  # The language you speak to Jarvis: "en", "hi" (Hindi), "bn" (Bengali) or
+  # "auto". A fixed language is more reliable than "auto" for short commands.
+  language: "en"
+  # "local" = recognise speech on this PC (private, works offline). "cloud" =
+  # use your AI provider's hosted Whisper (Groq or OpenAI): far more accurate for
+  # Hindi and Bengali, but each voice recording is uploaded to that provider.
+  # Needs an OpenAI-compatible provider; falls back to local if it fails.
+  engine: "local"
 
 tts:
   rate: 185                 # words per minute, pyttsx3 default is ~200
