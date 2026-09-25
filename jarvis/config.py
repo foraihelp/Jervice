@@ -143,6 +143,17 @@ class Config:
         return (self.raw["brain"].get("reply_language", "") or "").strip().lower()
 
     @property
+    def follow_up_seconds(self) -> float:
+        """After answering a wake-word command, how long Jarvis keeps listening
+        for a follow-up without the wake word. 0 turns it off."""
+        value = (self.raw.get("conversation") or {}).get("follow_up_seconds", 6)
+        return max(0.0, min(30.0, float(value)))
+
+    @property
+    def confirm_risky(self) -> bool:
+        return bool((self.raw.get("safety") or {}).get("confirm_risky", True))
+
+    @property
     def effective_system_prompt(self) -> str:
         """system_prompt, with a language instruction appended when
         reply_language pins a specific output language. This is the
@@ -150,7 +161,7 @@ class Config:
         directly in that language, rather than answering in English and
         running a separate translation pass, which would double the
         latency and add a second point of failure for no real benefit."""
-        prompt = self.system_prompt
+        prompt = self.system_prompt + _CAPABILITY_NOTES
         if self.reply_language:
             prompt += (
                 f"\n\nAlways reply in {self.reply_language.capitalize()}, regardless of what "
@@ -191,6 +202,17 @@ class Config:
     def has_api_key(self) -> bool:
         return bool(self.brain_api_key)
 
+
+# Appended in code (rather than living only in config.yaml) so it also reaches
+# installs whose per-user config.yaml was copied from an older template.
+_CAPABILITY_NOTES = (
+    "\n\nTimers and reminders: use set_timer for durations ('in 10 minutes') and set_reminder for a "
+    "specific clock time, working the time out from the current date and time given below. They are "
+    "spoken aloud when due. Memory: when the user asks you to remember something about themselves, "
+    "call remember; use remembered facts naturally without reciting them; call forget if asked. "
+    "Safety: closing apps or windows and locking the PC first return 'CONFIRMATION REQUIRED' -- when "
+    "that happens, ask the user one short yes/no question and call the tool again only after they say yes."
+)
 
 _PLACEHOLDER_API_KEY = "sk-ant-your-key-here"
 _PLACEHOLDER_API_TOKEN = "change-me-to-a-long-random-string"
@@ -267,6 +289,7 @@ def save_settings(payload: dict[str, Any]) -> None:
     tts_rate (int), tts_volume (float 0-1), tts_output_device (str,
     substring of a SAPI5 device name, blank = system default),
     reply_language (str, "" / "english" / "hindi" / "bengali"),
+    follow_up_seconds (number, 0 = off), confirm_risky (bool),
     tts_engine ("auto" / "sapi" / "edge"), input_device (str, microphone
     name substring, blank = system default),
     server_enabled (bool),
@@ -297,6 +320,10 @@ def save_settings(payload: dict[str, Any]) -> None:
         data.setdefault("recording", {})["input_device"] = (payload["input_device"] or "").strip()
     if payload.get("tts_engine") in ("auto", "sapi", "edge"):
         data["tts"]["engine"] = payload["tts_engine"]
+    if "follow_up_seconds" in payload:
+        data.setdefault("conversation", {})["follow_up_seconds"] = max(0, min(30, float(payload["follow_up_seconds"])))
+    if "confirm_risky" in payload:
+        data.setdefault("safety", {})["confirm_risky"] = bool(payload["confirm_risky"])
     if "reply_language" in payload:
         data.setdefault("brain", {})["reply_language"] = (payload["reply_language"] or "").strip().lower()
     if "server_enabled" in payload:

@@ -11,9 +11,11 @@ from typing import Callable, Optional
 
 from anthropic import Anthropic
 
+from jarvis.brain.context import dynamic_context
 from jarvis.brain.memory import Memory
 from jarvis.brain.streaming import SentenceStreamer
 from jarvis.tools.registry import TOOL_SCHEMAS, run_tool
+from jarvis.tools.safety import begin_turn, end_turn
 
 logger = logging.getLogger("jarvis.brain")
 
@@ -42,13 +44,15 @@ class AnthropicBrain:
         it, one sentence at a time, while it is still being generated -- the
         caller should speak those instead of speaking the return value."""
         with self._lock:
-            return self._respond_locked(user_text, on_sentence)
+            reply = self._respond_locked(user_text, on_sentence)
+        end_turn(reply)
+        return reply
 
     def _create(self, streamer: Optional[SentenceStreamer]):
         kwargs = dict(
             model=self.model,
             max_tokens=self.max_tokens,
-            system=self.system_prompt,
+            system=self.system_prompt + dynamic_context(self.memory),
             tools=TOOL_SCHEMAS,
             messages=self.memory.recent_messages(),
         )
@@ -65,6 +69,7 @@ class AnthropicBrain:
 
     def _respond_locked(self, user_text: str, on_sentence: Optional[Callable[[str], None]]) -> str:
         streamer = SentenceStreamer(on_sentence) if on_sentence else None
+        begin_turn(user_text)
         self.memory.add_message("user", user_text)
 
         for _ in range(MAX_TOOL_ITERATIONS):

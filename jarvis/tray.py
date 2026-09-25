@@ -64,6 +64,14 @@ class TrayApp:
         icon.stop()
         self._on_quit()
 
+    def notify(self, message: str) -> None:
+        """Shows a Windows notification from the tray icon, so a reminder is
+        visible even when the window is hidden. Best effort."""
+        try:
+            self._icon.notify(message, "Jarvis")
+        except Exception:  # noqa: BLE001
+            logger.debug("Could not show tray notification", exc_info=True)
+
     def run(self) -> None:
         """Blocks the calling thread running the tray event loop. Call this
         from the main thread (required on Windows/macOS)."""

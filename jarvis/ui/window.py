@@ -181,6 +181,8 @@ class SettingsAPI:
             "tts_volume": self.config.tts_volume,
             "tts_output_device": self.config.tts_output_device,
             "reply_language": self.config.reply_language,
+            "follow_up_seconds": self.config.follow_up_seconds,
+            "confirm_risky": self.config.confirm_risky,
             "tts_engine": self.config.tts_engine,
             "input_device": self.config.input_device,
             "server_enabled": self.config.server_enabled,
@@ -235,6 +237,10 @@ class SettingsAPI:
 
         save_settings(payload)
         self.config = load_config()
+        if "confirm_risky" in payload:
+            from jarvis.tools import safety
+
+            safety.configure(self.config.confirm_risky)  # applies immediately, no restart
 
         applied_live = False
         if self._BRAIN_AFFECTING_KEYS & payload.keys():

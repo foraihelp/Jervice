@@ -25,7 +25,8 @@ from jarvis.brain.memory import Memory
 from jarvis.brain.streaming import respond_speaking
 from jarvis.config import load_config
 from jarvis.server import run_server
-from jarvis.tools import registry
+from jarvis.conversation import VoiceConversation
+from jarvis.tools import memory_tools, registry, reminders, safety
 from jarvis.tray import TrayApp
 from jarvis.ui.window import (
     create_main_window,
@@ -209,46 +210,49 @@ def main() -> None:
 
     threading.Timer(3.0, _auto_check_for_updates).start()
 
+    def record_turn(no_speech_timeout):
+        return record_command(
+            sample_rate=config.sample_rate,
+            silence_seconds=config.silence_seconds,
+            max_seconds=config.max_record_seconds,
+            silence_rms_threshold=config.silence_rms_threshold,
+            input_device=config.input_device,
+            no_speech_timeout=no_speech_timeout,
+        )
+
+    def respond_turn(text):
+        before = registry.call_count()
+        reply = respond_speaking(brain_holder.brain, text, speaker, "Sorry, I hit an error handling that.")
+        after = registry.call_count()
+        return reply, (registry.get_recent_calls(after - before) if after > before else [])
+
     def handle_wake() -> None:
         if tray.muted.is_set():
             logger.debug("Wake word detected but microphone is muted; ignoring.")
             return
+        VoiceConversation(
+            record=record_turn,
+            transcribe=lambda audio: transcriber.transcribe(audio, config.sample_rate),
+            respond=respond_turn,
+            speaker=speaker,
+            is_muted=tray.muted.is_set,
+            on_status=lambda **fields: push_status(window, **fields),
+            on_message=lambda role, text, tools=None: push_message(window, role, text, tools),
+            follow_up_seconds=config.follow_up_seconds,
+        ).run()
 
-        push_status(window, listening=True, statusLine="LISTENING...")
-        try:
-            audio = record_command(
-                sample_rate=config.sample_rate,
-                silence_seconds=config.silence_seconds,
-                max_seconds=config.max_record_seconds,
-                silence_rms_threshold=config.silence_rms_threshold,
-                input_device=config.input_device,
-            )
-        except MicrophoneError as exc:
-            # Not caught, this would kill the wake-word background thread
-            # entirely (silently, from the user's perspective -- "Hey
-            # Jarvis" would just stop doing anything, forever, with no
-            # indication why) since this runs inside WakeWordListener's
-            # on_wake callback with nothing else to catch it.
-            logger.warning("Microphone error while recording a command: %s", exc)
-            push_message(window, "jarvis", str(exc))
-            push_status(window, listening=False, statusLine="WAKE WORD · HEY JARVIS")
-            return
-        text = transcriber.transcribe(audio, config.sample_rate)
-        if not text:
-            logger.info("Heard nothing intelligible, ignoring.")
-            push_status(window, listening=False, statusLine="WAKE WORD · HEY JARVIS")
-            return
+    def announce_reminder(text: str) -> None:
+        logger.info("Reminder due: %s", text)
+        speaker.say(text)
+        push_message(window, "jarvis", text)
+        tray.notify(text)
 
-        push_message(window, "user", text)
-        push_status(window, listening=False, statusLine="THINKING...")
-
-        before = registry.call_count()
-        reply = respond_speaking(brain_holder.brain, text, speaker, "Sorry, I hit an error handling that.")
-        after = registry.call_count()
-        tools_used = registry.get_recent_calls(after - before) if after > before else []
-
-        push_message(window, "jarvis", reply, tools_used)
-        push_status(window, statusLine="WAKE WORD · HEY JARVIS")
+    # Loaded from the user's data folder, so timers and remembered facts survive
+    # closing Jarvis. Started here (not earlier) because announcing one needs
+    # the speaker, window and tray to exist.
+    safety.configure(config.confirm_risky)
+    memory_tools.configure(lambda: brain_holder.brain.memory)
+    reminders.configure(config.memory_file.parent / "reminders.json", announce_reminder)
 
     def wake_word_thread() -> None:
         try:

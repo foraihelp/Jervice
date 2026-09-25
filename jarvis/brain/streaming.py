@@ -55,6 +55,17 @@ class SentenceStreamer:
         self._buffer = buf[cut:]
 
 
+def _friendly_error(exc: Exception, default: str) -> str:
+    """A specific message for the failures users can act on, instead of the
+    generic one (a rate limit is not a settings problem)."""
+    status = getattr(exc, "status_code", None)
+    if status == 429:
+        return "The AI provider is limiting how fast I can ask it questions right now. Give it a minute and try again."
+    if status in (401, 403):
+        return "The AI provider didn't accept my API key. Please check it in Settings."
+    return default
+
+
 class SpeechCancelled(Exception):
     """Raised inside a brain's streaming loop once the user has pressed Stop,
     to abandon the rest of the reply (and close the connection to the model)
@@ -72,9 +83,9 @@ def respond_speaking(brain, text: str, speaker, error_reply: str) -> str:
     if speaker is None:
         try:
             return brain.respond(text)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             logger.exception("brain.respond() failed for %r", text)
-            return error_reply
+            return _friendly_error(exc, error_reply)
 
     generation = speaker.generation
     delivered: list[str] = []
@@ -90,8 +101,9 @@ def respond_speaking(brain, text: str, speaker, error_reply: str) -> str:
     except SpeechCancelled:
         logger.info("Reply stopped by the user.")
         return " ".join(delivered + ["[stopped]"])
-    except Exception:  # noqa: BLE001 - one bad turn must not kill the caller
+    except Exception as exc:  # noqa: BLE001 - one bad turn must not kill the caller
         logger.exception("brain.respond() failed for %r", text)
+        error_reply = _friendly_error(exc, error_reply)
         if speaker.generation == generation:
             speaker.say(error_reply)
         return error_reply

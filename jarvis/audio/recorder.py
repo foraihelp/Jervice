@@ -52,6 +52,7 @@ def record_command(
     max_seconds: float,
     silence_rms_threshold: float = 400.0,
     input_device: str = "",
+    no_speech_timeout: float | None = None,
 ) -> np.ndarray:
     """Records mono int16 audio from the default microphone until the user
     stops talking (RMS-detected silence) or `max_seconds` is reached.
@@ -61,6 +62,10 @@ def record_command(
     roughly 50-300; normal speech is usually well above 1000. If Jarvis
     stops recording too early, lower the threshold in config.yaml; if it
     keeps recording through silence (picking up background noise), raise it.
+
+    If `no_speech_timeout` is given and nobody starts speaking within that many
+    seconds, returns an empty array (used for follow-up listening, where silence
+    means the conversation is over).
 
     Returns the recorded audio as a 1-D numpy int16 array.
     """
@@ -116,6 +121,9 @@ def record_command(
                 if silence_run >= silence_frames_needed:
                     logger.info("Silence detected, stopping recording.")
                     break
+            elif no_speech_timeout is not None and frame_count * FRAME_MS / 1000 >= no_speech_timeout:
+                logger.info("No speech within %.0fs.", no_speech_timeout)
+                return np.zeros((0,), dtype=np.int16)
 
     if not frames:
         return np.zeros((0,), dtype=np.int16)

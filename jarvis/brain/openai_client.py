@@ -15,13 +15,16 @@ from typing import Callable, Optional
 
 from openai import OpenAI
 
+from jarvis.brain.context import dynamic_context
 from jarvis.brain.memory import Memory
 from jarvis.brain.streaming import SentenceStreamer
 from jarvis.tools.registry import TOOL_SCHEMAS, run_tool
+from jarvis.tools.safety import begin_turn, end_turn
 
 logger = logging.getLogger("jarvis.brain")
 
 MAX_TOOL_ITERATIONS = 6  # safety cap against runaway tool-use loops
+_STREAMING_REFUSED_STATUSES = {400, 404, 405, 415, 422, 501}
 
 
 def _openai_tools() -> list[dict]:
@@ -69,7 +72,9 @@ class OpenAIBrain:
         is still being generated -- the caller should speak those instead of
         speaking the return value."""
         with self._lock:
-            return self._respond_locked(user_text, on_sentence)
+            reply = self._respond_locked(user_text, on_sentence)
+        end_turn(reply)
+        return reply
 
     def _complete(self, messages: list[dict], streamer: Optional[SentenceStreamer]) -> tuple[str, list[dict]]:
         """One model call. Returns (text, tool_calls) where each tool call is
@@ -98,10 +103,13 @@ class OpenAIBrain:
                                 slot["name"] = tc.function.name
                             if tc.function.arguments:
                                 slot["arguments"] += tc.function.arguments
-            except Exception:
-                if text_parts or calls:
+            except Exception as exc:
+                # Only fall back when the endpoint refused the streaming request itself.
+                # Anything else (a rate limit, an outage) would fail again, and retrying
+                # would just spend more of the rate limit.
+                if text_parts or calls or getattr(exc, "status_code", None) not in _STREAMING_REFUSED_STATUSES:
                     raise
-                logger.warning("Streaming request failed before any output; retrying without streaming.", exc_info=True)
+                logger.warning("Endpoint rejected streaming (HTTP %s); retrying without streaming.", exc.status_code)
             else:
                 streamer.flush()
                 tool_calls = [
@@ -123,10 +131,14 @@ class OpenAIBrain:
 
     def _respond_locked(self, user_text: str, on_sentence: Optional[Callable[[str], None]]) -> str:
         streamer = SentenceStreamer(on_sentence) if on_sentence else None
+        begin_turn(user_text)
         self.memory.add_message("user", user_text)
 
         for _ in range(MAX_TOOL_ITERATIONS):
-            messages = [{"role": "system", "content": self.system_prompt}, *self.memory.recent_messages()]
+            messages = [
+                {"role": "system", "content": self.system_prompt + dynamic_context(self.memory)},
+                *self.memory.recent_messages(),
+            ]
             text, tool_calls = self._complete(messages, streamer)
 
             if not tool_calls:

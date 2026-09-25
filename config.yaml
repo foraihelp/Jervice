@@ -96,6 +96,17 @@ brain:
     read aloud via text-to-speech -- avoid long lists, code blocks, or
     markdown in your replies.
 
+conversation:
+  # After answering a wake-word command, keep listening this many seconds for
+  # a follow-up without needing "Hey Jarvis" again. 0 turns it off. Say
+  # "thanks" or "that's all" to end it early.
+  follow_up_seconds: 6
+
+safety:
+  # Ask "Do you want me to ...?" and wait for a yes before closing an app or
+  # window, or locking the PC.
+  confirm_risky: true
+
 memory:
   # Number of most recent conversation turns kept in context.
   history_turns: 20

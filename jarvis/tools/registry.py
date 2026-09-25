@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
-from jarvis.tools import apps, files, location, system, system_monitor, web, windows_control
+from jarvis.tools import apps, files, location, memory_tools, reminders, safety, system, system_monitor, web, windows_control
 
 logger = logging.getLogger("jarvis.tools.registry")
 
@@ -28,7 +28,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "close_app",
-        "description": "Close/terminate all running processes matching a name, e.g. 'notepad', 'chrome'.",
+        "description": "Close/terminate all running processes matching a name, e.g. 'notepad', 'chrome'. Asks the user to confirm first (the first call returns CONFIRMATION REQUIRED).",
         "input_schema": {
             "type": "object",
             "properties": {"name": {"type": "string", "description": "Process/application name to close."}},
@@ -74,7 +74,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "close_window",
-        "description": "Close a window, matched by a substring of its title.",
+        "description": "Close a window, matched by a substring of its title. Asks the user to confirm first (the first call returns CONFIRMATION REQUIRED).",
         "input_schema": {
             "type": "object",
             "properties": {"title_substring": {"type": "string"}},
@@ -107,7 +107,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "lock_workstation",
-        "description": "Lock the Windows workstation (requires the user's password to unlock again).",
+        "description": "Lock the Windows workstation (requires the user's password to unlock again). Asks the user to confirm first (the first call returns CONFIRMATION REQUIRED).",
         "input_schema": {"type": "object", "properties": {}},
     },
     {
@@ -168,6 +168,65 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "set_timer",
+        "description": "Start a countdown timer. It is spoken aloud when it finishes. Use for relative durations like 'in 10 minutes' or 'a 25 minute timer'. Convert the duration to seconds yourself.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "duration_seconds": {"type": "number", "description": "Length of the timer in SECONDS (10 minutes = 600)."},
+                "label": {"type": "string", "description": "Optional short name, e.g. 'tea'."},
+            },
+            "required": ["duration_seconds"],
+        },
+    },
+    {
+        "name": "set_reminder",
+        "description": "Set a reminder for a specific date and clock time; it is spoken aloud when due, even if Jarvis is restarted in between. Work out the exact time from the current local date and time given in the system prompt.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "when": {"type": "string", "description": "Local date and time as 'YYYY-MM-DD HH:MM' in 24-hour format, e.g. '2026-09-27 17:00'."},
+                "message": {"type": "string", "description": "What to remind the user about, phrased as the reminder itself, e.g. 'call mom'."},
+            },
+            "required": ["when", "message"],
+        },
+    },
+    {
+        "name": "list_reminders",
+        "description": "List the timers and reminders that are currently set.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "cancel_reminder",
+        "description": "Cancel a timer or reminder, matched by its id or by words from its message or label.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "Words from the reminder, or its id."}},
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "remember",
+        "description": "Save something the user asked you to remember about themselves or their preferences (name, family, favourites, habits). Saved facts are shown to you on every future request. Use a short label so a later value replaces an older one, e.g. key 'user name', value 'Ravi'. Only call this when the user explicitly asks you to remember something.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "key": {"type": "string", "description": "Short label, e.g. 'favourite tea'."},
+                "value": {"type": "string", "description": "The thing to remember."},
+            },
+            "required": ["key", "value"],
+        },
+    },
+    {
+        "name": "forget",
+        "description": "Delete a remembered fact, matched by (part of) its label.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"key": {"type": "string", "description": "Label of the fact to forget."}},
+            "required": ["key"],
+        },
+    },
+    {
         "name": "get_current_location",
         "description": "Reports an approximate current location (city/region/country) based on this PC's internet connection (IP-based geolocation). This is a desktop machine with no real GPS hardware, so it's only accurate to roughly city level -- not precise, and can be wrong if a VPN is active. Use for 'where am I' or location-dependent questions (e.g. as a starting point before a web_search for local weather/news), and be upfront that it's an approximation, not GPS.",
         "input_schema": {"type": "object", "properties": {}},
@@ -214,6 +273,12 @@ TOOL_DISPATCH: dict[str, Callable[..., str]] = {
     "web_search": lambda query: web.web_search(query),
     "wikipedia_lookup": lambda query: web.wikipedia_lookup(query),
     "get_current_location": lambda: location.get_current_location(),
+    "set_timer": lambda duration_seconds, label="": reminders.set_timer(duration_seconds, label),
+    "set_reminder": lambda when, message: reminders.set_reminder(when, message),
+    "list_reminders": lambda: reminders.list_reminders(),
+    "cancel_reminder": lambda query: reminders.cancel_reminder(query),
+    "remember": lambda key, value: memory_tools.remember(key, value),
+    "forget": lambda key: memory_tools.forget(key),
     "get_system_status": lambda: system_monitor.get_system_status(),
     "set_brightness": lambda percent: system.set_brightness(percent),
     "get_brightness": lambda: system.get_brightness(),
@@ -253,6 +318,11 @@ def run_tool(name: str, tool_input: dict[str, Any]) -> str:
     fn = TOOL_DISPATCH.get(name)
     if fn is None:
         return f"Unknown tool '{name}'."
+    needs_confirmation = safety.check(name, tool_input)
+    if needs_confirmation is not None:
+        _total_calls += 1  # counted so the UI still shows what was attempted
+        _recent_calls.append(_format_call(name, tool_input) + " (awaiting confirmation)")
+        return needs_confirmation
     try:
         result = fn(**tool_input)
         return str(result)
