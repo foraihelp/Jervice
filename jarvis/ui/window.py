@@ -20,6 +20,7 @@ from typing import Any, Optional
 logger = logging.getLogger("jarvis.ui")
 
 from jarvis import history, storage
+from jarvis.audio.errors import SpeechNotReady
 from jarvis.brain.streaming import respond_speaking
 
 if getattr(sys, "frozen", False):
@@ -115,6 +116,10 @@ class JarvisAPI:
         # Borrow it for the duration of this recording, same as
         # WakeWordListener.listen_forever() already does around a
         # wake-word-triggered recording.
+        if not self.transcriber.is_available():
+            # Nothing could understand a recording yet (first-run download, or offline).
+            self.transcriber.start_loading()
+            return {"heard": "", "reply": "", "tools": [], "notice": self.transcriber.not_ready_message()}
         if self.wake_word_listener is not None:
             self.wake_word_listener.pause()
         try:
@@ -128,7 +133,10 @@ class JarvisAPI:
         finally:
             if self.wake_word_listener is not None:
                 self.wake_word_listener.resume()
-        text = self.transcriber.transcribe(audio, self.config.sample_rate)
+        try:
+            text = self.transcriber.transcribe(audio, self.config.sample_rate)
+        except SpeechNotReady as exc:
+            return {"heard": "", "reply": "", "tools": [], "notice": str(exc)}
         if not text:
             return {"heard": "", "reply": "", "tools": []}
 
@@ -477,6 +485,16 @@ def push_stream(window, text: str) -> None:
         window.evaluate_js(f"streamText({json.dumps(text)})")
     except Exception:
         logger.debug("push_stream failed (window not ready?)", exc_info=True)
+
+
+def push_speech_note(window, text: str) -> None:
+    """Shows (or, with empty text, clears) the speech-model progress on the status line."""
+    if window is None:
+        return
+    try:
+        window.evaluate_js(f"setSpeechNote({json.dumps(text)})")
+    except Exception:
+        logger.debug("push_speech_note failed (window not ready?)", exc_info=True)
 
 
 def push_status(window, **fields: Any) -> None:

@@ -17,7 +17,7 @@ from typing import Callable, Optional
 
 import numpy as np
 
-from jarvis.audio.errors import MicrophoneError
+from jarvis.audio.errors import MicrophoneError, SpeechNotReady
 
 logger = logging.getLogger("jarvis.conversation")
 
@@ -90,7 +90,12 @@ class VoiceConversation:
                     self._message("jarvis", str(exc))
                     return
 
-                text = self._transcribe(audio) if audio.size else ""
+                try:
+                    text = self._transcribe(audio) if audio.size else ""
+                except SpeechNotReady as exc:
+                    logger.info("Voice command heard but speech recognition isn't ready: %s", exc)
+                    self._message("jarvis", str(exc))
+                    return
                 if not text:
                     logger.info("Heard nothing%s.", "" if turn == 0 else " more; conversation over")
                     return

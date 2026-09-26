@@ -34,6 +34,7 @@ from jarvis.ui.window import (
     create_main_window,
     open_settings_window,
     push_message,
+    push_speech_note,
     push_status,
     push_stream,
     push_update_status,
@@ -164,7 +165,7 @@ def main() -> None:
         device=config.stt_device,
         compute_type=config.stt_compute_type,
     )
-    transcriber.apply_config(config)
+    transcriber.apply_config(config)   # the model itself loads in the background once the window is up
 
     # window_holder lets the tray's "Show Jarvis" callback reach the window
     # object even though the window is created after the tray (TrayApp
@@ -195,6 +196,48 @@ def main() -> None:
 
     window = create_main_window(brain_holder, transcriber, config, tray, wake_word_listener, speaker)
     window_holder["window"] = window
+
+    # Voice needs the speech model, which the very first start has to download. That happens in
+    # the background so the window is usable straight away: the status line shows progress and
+    # typing works meanwhile.
+    speech_announced = {"download": False}
+    page_loaded = threading.Event()
+    speech_backlog: list = []   # what to show once the page can (never blocks the loading thread)
+
+    def show_when_loaded(action) -> None:
+        if page_loaded.is_set():
+            action()
+        else:
+            speech_backlog.append(action)
+
+    def on_speech_state(state: str, detail: str) -> None:
+        show_when_loaded(lambda: push_speech_note(window, detail))
+        if state == "downloading" and not speech_announced["download"]:
+            speech_announced["download"] = True
+            show_when_loaded(lambda: push_message(
+                window, "jarvis",
+                "First start: I'm downloading my speech recognition (about 500 MB, one time only). "
+                "You can type to me right away, and voice will work when it finishes.",
+            ))
+        elif state == "ready" and speech_announced["download"]:
+            show_when_loaded(lambda: push_message(window, "jarvis", "Speech recognition is ready. You can talk to me now."))
+        elif state == "failed" and not transcriber.is_available():
+            show_when_loaded(lambda: push_message(window, "jarvis", transcriber.not_ready_message()))
+
+    def flush_speech_backlog() -> None:
+        page_loaded.set()
+        while speech_backlog:
+            speech_backlog.pop(0)()
+
+    transcriber.set_listener(on_speech_state)
+    try:
+        window.events.loaded += flush_speech_backlog
+    except Exception:
+        logger.debug("Could not attach the speech status to the window", exc_info=True)
+        page_loaded.set()
+    # Started right away rather than on the page's load event: it must not depend on the window
+    # having been shown (a minimised or tray-started window may not load its page for a while).
+    transcriber.start_loading()
 
     if storage.startup_notice:
         # Said once, in the window: the data folder was created, moved, or couldn't be used.
@@ -259,9 +302,18 @@ def main() -> None:
             history.add(role, text, tools)
         push_message(window, role, text, tools)
 
+    not_ready_told = {"at": -1000.0}
+
     def handle_wake() -> None:
         if tray.muted.is_set():
             logger.debug("Wake word detected but microphone is muted; ignoring.")
+            return
+        if not transcriber.is_available():
+            # Still downloading (or offline): recording a command now would only be thrown away.
+            transcriber.start_loading()
+            if time.monotonic() - not_ready_told["at"] > 45:
+                not_ready_told["at"] = time.monotonic()
+                show_message("jarvis", transcriber.not_ready_message())
             return
         VoiceConversation(
             record=record_turn,

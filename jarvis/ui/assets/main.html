@@ -286,7 +286,22 @@
         ? '0 0 44px rgba(111,227,255,0.85)'
         : '0 0 28px rgba(111,227,255,0.45)';
     }
-    if (status.statusLine) document.getElementById('status-line').textContent = status.statusLine;
+    if (status.statusLine) {
+      // While the speech model is downloading/loading, the idle line says so instead.
+      const idle = status.statusLine.indexOf('WAKE WORD') === 0;
+      document.getElementById('status-line').textContent = idle && speechNote ? speechNote : status.statusLine;
+    }
+  }
+
+  // Set by Jarvis while the speech model downloads or loads; empty when it is ready.
+  let speechNote = '';
+  function setSpeechNote(text) {
+    speechNote = text || '';
+    const line = document.getElementById('status-line');
+    const t = line.textContent;
+    if (t.indexOf('WAKE WORD') === 0 || t.indexOf('SPEECH MODEL') >= 0 || (!speechNote && t.indexOf('SPEECH') === 0)) {
+      line.textContent = speechNote || 'WAKE WORD · HEY JARVIS';
+    }
   }
 
   function setModel(model) {
@@ -409,6 +424,8 @@
       if (result.heard) {
         appendMessage('user', result.heard);
         appendMessage('jarvis', result.reply, result.tools);
+      } else if (result.notice) {
+        appendMessage('jarvis', result.notice);
       } else {
         appendMessage('system', 'Heard nothing.');
       }

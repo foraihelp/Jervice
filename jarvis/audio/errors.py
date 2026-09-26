@@ -16,3 +16,9 @@ class MicrophoneError(Exception):
     denied, no device, device busy) -- as opposed to a transcription or
     recording-logic failure. Carries a message a user can actually act on
     instead of PortAudio's native error text (e.g. "PaErrorCode -9999")."""
+
+
+class SpeechNotReady(RuntimeError):
+    """Raised when no speech recogniser can run right now (the speech model is still
+    downloading, or could not be downloaded). The message is written for the person
+    using Jarvis, so it can be shown as is."""
