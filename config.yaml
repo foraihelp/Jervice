@@ -104,6 +104,14 @@ brain:
     read aloud via text-to-speech -- avoid long lists, code blocks, or
     markdown in your replies.
 
+storage:
+  # Where Jarvis keeps your conversations, remembered facts, reminders and the
+  # documents it creates. Blank = Documents\Jarvis. Change or rename it from
+  # Settings (it moves at the next start). Your settings and API key stay in
+  # AppData, not here.
+  data_dir: ""
+  active_dir: ""   # filled in by Jarvis: the folder actually in use
+
 conversation:
   # After answering a wake-word command, keep listening this many seconds for
   # a follow-up without needing "Hey Jarvis" again. 0 turns it off. Say

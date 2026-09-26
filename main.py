@@ -21,6 +21,7 @@ from jarvis.audio.stt import Transcriber
 from jarvis.audio.tts import Speaker
 from jarvis.audio.wake_word import WakeWordListener
 from jarvis.brain import BrainHolder, create_brain
+from jarvis import history, storage
 from jarvis.brain import progress
 from jarvis.brain.memory import Memory
 from jarvis.brain.streaming import respond_speaking
@@ -102,8 +103,18 @@ def _acquire_single_instance_lock() -> bool:
     import winerror
 
     global _single_instance_mutex_handle
-    _single_instance_mutex_handle = win32event.CreateMutex(None, False, _SINGLE_INSTANCE_MUTEX_NAME)
-    return win32api.GetLastError() != winerror.ERROR_ALREADY_EXISTS
+    # A restart from Settings launches the new copy while the old one is still shutting down, so
+    # that one waits a few seconds for the old copy to let go instead of giving up.
+    attempts = 20 if os.environ.get("JARVIS_RESTARTING") else 1
+    for attempt in range(attempts):
+        handle = win32event.CreateMutex(None, False, _SINGLE_INSTANCE_MUTEX_NAME)
+        if win32api.GetLastError() != winerror.ERROR_ALREADY_EXISTS:
+            _single_instance_mutex_handle = handle
+            return True
+        win32api.CloseHandle(handle)
+        if attempt + 1 < attempts:
+            time.sleep(0.5)
+    return False
 
 
 _single_instance_mutex_handle = None  # kept alive for the process's lifetime; see _acquire_single_instance_lock
@@ -131,6 +142,8 @@ def main() -> None:
         return
 
     config = load_config()
+    storage.initialize(config)   # carries out a pending move/rename of the data folder, before anything is open
+    history.configure(storage.history_file())
     setup_logging(config.log_level, config.log_file)
     logger.info("Starting Jarvis...")
 
@@ -183,6 +196,13 @@ def main() -> None:
     window = create_main_window(brain_holder, transcriber, config, tray, wake_word_listener, speaker)
     window_holder["window"] = window
 
+    if storage.startup_notice:
+        # Said once, in the window: the data folder was created, moved, or couldn't be used.
+        try:
+            window.events.loaded += lambda: push_message(window, "jarvis", storage.startup_notice)
+        except Exception:
+            logger.debug("Could not attach the storage notice", exc_info=True)
+
     if not config.has_api_key:
         # First run on a fresh install/machine: no crash, no manual .env
         # editing required -- just point the user at Settings once the
@@ -234,6 +254,11 @@ def main() -> None:
         after = registry.call_count()
         return reply, (registry.get_recent_calls(after - before) if after > before else [])
 
+    def show_message(role, text, tools=None) -> None:
+        if role in ("user", "jarvis"):
+            history.add(role, text, tools)
+        push_message(window, role, text, tools)
+
     def handle_wake() -> None:
         if tray.muted.is_set():
             logger.debug("Wake word detected but microphone is muted; ignoring.")
@@ -245,13 +270,14 @@ def main() -> None:
             speaker=speaker,
             is_muted=tray.muted.is_set,
             on_status=lambda **fields: push_status(window, **fields),
-            on_message=lambda role, text, tools=None: push_message(window, role, text, tools),
+            on_message=show_message,
             follow_up_seconds=config.follow_up_seconds,
         ).run()
 
     def announce_reminder(text: str) -> None:
         logger.info("Reminder due: %s", text)
         speaker.say(text)
+        history.add("jarvis", text)
         push_message(window, "jarvis", text)
         tray.notify(text)
 
@@ -266,7 +292,7 @@ def main() -> None:
     progress.set_listener(lambda message: push_status(window, statusLine=message))
     safety.configure(config.confirm_risky)
     memory_tools.configure(lambda: brain_holder.brain.memory)
-    reminders.configure(config.memory_file.parent / "reminders.json", announce_reminder)
+    reminders.configure(storage.reminders_file(), announce_reminder)
 
     def wake_word_thread() -> None:
         try:

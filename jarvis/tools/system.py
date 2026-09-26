@@ -108,12 +108,14 @@ def get_default_output_device() -> str:
         return f"I couldn't check the default output device: {exc}"
 
 
-def take_screenshot(save_dir: str = "data/screenshots") -> str:
+def take_screenshot(save_dir: str = "") -> str:
     from datetime import datetime
 
     from PIL import ImageGrab
 
-    out_dir = Path(save_dir)
+    from jarvis import storage
+
+    out_dir = Path(save_dir) if save_dir else storage.screenshots_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
     filename = out_dir / f"screenshot_{datetime.now():%Y%m%d_%H%M%S}.png"
 

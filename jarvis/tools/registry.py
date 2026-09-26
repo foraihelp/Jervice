@@ -258,13 +258,13 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "create_text_file",
-        "description": "Write a new document for the user: saves the text as a file (in Documents unless told otherwise) and opens it. A .txt opens in Notepad; a .docx is a Word document and opens in Word (use .docx when the user asks for Word). Use for a letter, note, list or any text. Never overwrites.",
+        "description": "Write a new document for the user: saves the text as a file (in Jarvis's own documents folder unless told otherwise) and opens it. A .txt opens in Notepad; a .docx is a Word document and opens in Word (use .docx when the user asks for Word). Use for a letter, note, list or any text. Never overwrites.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "filename": {"type": "string", "description": "File name, e.g. 'leave_application.txt', or .docx for Word."},
                 "content": {"type": "string", "description": "The full text of the document."},
-                "folder": {"type": "string", "description": "Folder name or path. Default Documents."},
+                "folder": {"type": "string", "description": "Folder name or path. Leave out to use Jarvis's documents folder."},
             },
             "required": ["filename", "content"],
         },
@@ -330,7 +330,7 @@ TOOL_DISPATCH: dict[str, Callable[..., str]] = {
     "list_folder": lambda path, limit=40: files.list_folder(path, limit),
     "organize_folder": lambda path, keep_originals=False, dry_run=True: files.organize_folder(path, keep_originals, dry_run),
     "undo_organize": lambda: files.undo_organize(),
-    "create_text_file": lambda filename, content, folder="Documents": files.create_text_file(filename, content, folder),
+    "create_text_file": lambda filename, content, folder="": files.create_text_file(filename, content, folder),
     "type_into_window": lambda title_substring, text: windows_control.type_into_window(title_substring, text),
     "get_current_location": lambda: location.get_current_location(),
     "set_timer": lambda duration_seconds, label="": reminders.set_timer(duration_seconds, label),

@@ -36,6 +36,9 @@
   #save-btn:hover { filter: brightness(1.08); }
   #save-status { font-size: 11px; color: #56677A; text-align: center; margin-top: 8px; height: 14px; }
 
+  .mini-btn { padding: 7px 12px; border-radius: 7px; border: 1px solid rgba(120,190,255,0.22); font-size: 11.5px; color: #D7E2EA; cursor: pointer; white-space: nowrap; transition: all 0.15s ease; }
+  .mini-btn:hover { border-color: rgba(111,227,255,0.5); color: #EAF6FC; }
+  .mini-btn.accent { background: oklch(78% 0.14 200); color: #04141C; border-color: transparent; font-weight: 600; }
   .provider-option { color: #8CA0B3; transition: all 0.15s ease; }
   .provider-option.selected { border-color: rgba(111,227,255,0.6) !important; color: #EAF6FC; background: rgba(111,227,255,0.08); box-shadow: 0 0 14px rgba(111,227,255,0.15); }
   .preset-btn:hover { border-color: rgba(111,227,255,0.5) !important; color: #EAF6FC !important; }
@@ -80,6 +83,27 @@
       <div style="font-size:11px; color:#56677A; margin-bottom:6px; margin-top:14px;">API KEY</div>
       <input id="api-key" type="password" placeholder="sk-...">
       <div id="key-status" style="font-size:11px; margin-top:10px;"></div>
+    </div>
+
+    <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
+
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">YOUR DATA</div>
+      <div style="font-size:11px; color:#4A5A6A; margin-bottom:10px;">Jarvis keeps your conversations, remembered facts, reminders and the documents it creates in this folder. Your API key and settings stay in AppData, not here.</div>
+      <input id="data-path" type="text" readonly data-tip="The folder Jarvis is using now">
+      <div id="data-summary" style="font-size:11px; color:#56677A; margin-top:6px;"></div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+        <div id="data-change" class="mini-btn" data-tip="Pick another folder. Windows' folder picker has a Make New Folder button">Change folder&hellip;</div>
+        <div id="data-rename" class="mini-btn" data-tip="Give the current folder a different name">Rename&hellip;</div>
+        <div id="data-open" class="mini-btn" data-tip="Open the folder in File Explorer">Open</div>
+        <div id="data-clear" class="mini-btn" data-tip="Delete the saved conversation shown when the app starts. The AI's memory and your documents stay">Clear chat history</div>
+      </div>
+      <div id="data-rename-row" style="display:none; gap:8px; margin-top:10px; align-items:center;">
+        <input id="data-new-name" type="text" placeholder="New folder name" style="flex:1;">
+        <div id="data-rename-go" class="mini-btn accent">Rename</div>
+      </div>
+      <div id="data-status" style="font-size:11px; margin-top:10px; color:#56677A;"></div>
+      <div id="data-restart" class="mini-btn accent" style="display:none; margin-top:10px;" data-tip="Restarts Jarvis and moves your data into the folder above">Restart now to move it</div>
     </div>
 
     <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
@@ -491,6 +515,71 @@
 
   $('close-btn').addEventListener('click', () => { window.pywebview.api.close(); });
 
+  // ---- your data folder
+  const fmtBytes = (n) => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(0) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
+
+  function dataStatus(text, color) {
+    $('data-status').textContent = text;
+    $('data-status').style.color = color || '#56677A';
+  }
+
+  function showPending(path) {
+    dataStatus('Will move to ' + path + ' when Jarvis restarts. Nothing has moved yet.', '#FFB454');
+    $('data-restart').style.display = 'inline-block';
+  }
+
+  async function loadStorage() {
+    try {
+      const st = await window.pywebview.api.get_storage();
+      $('data-path').value = st.path;
+      $('data-summary').textContent = st.file_count + ' files, ' + fmtBytes(st.size_bytes) + '. Default location: ' + st.default_path;
+      if (st.pending_path) showPending(st.pending_path);
+    } catch (e) {
+      dataStatus('Could not read the data folder: ' + e, '#E36B6B');
+    }
+  }
+
+  function handleChange(res) {
+    if (!res.ok) { dataStatus(res.message, '#E36B6B'); return; }
+    if (res.needs_restart) showPending(res.path);
+    else dataStatus('That is already the current folder.');
+  }
+
+  $('data-change').addEventListener('click', async () => {
+    const picked = await window.pywebview.api.choose_data_folder();
+    if (picked) handleChange(await window.pywebview.api.set_data_folder(picked));
+  });
+  $('data-rename').addEventListener('click', () => {
+    const row = $('data-rename-row');
+    row.style.display = row.style.display === 'none' ? 'flex' : 'none';
+    const current = $('data-path').value.replace(/[\\/]+$/, '').split(/[\\/]/).pop();
+    $('data-new-name').value = current;
+    $('data-new-name').focus();
+    $('data-new-name').select();
+  });
+  $('data-rename-go').addEventListener('click', async () => {
+    handleChange(await window.pywebview.api.rename_data_folder($('data-new-name').value));
+  });
+  $('data-new-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('data-rename-go').click(); });
+  $('data-open').addEventListener('click', () => window.pywebview.api.open_data_folder());
+
+  let clearArmed = false;
+  $('data-clear').addEventListener('click', async () => {
+    if (!clearArmed) {
+      clearArmed = true;
+      $('data-clear').textContent = 'Click again to confirm';
+      setTimeout(() => { clearArmed = false; $('data-clear').textContent = 'Clear chat history'; }, 4000);
+      return;
+    }
+    clearArmed = false;
+    $('data-clear').textContent = 'Clear chat history';
+    await window.pywebview.api.clear_history();
+    dataStatus('Saved conversation cleared. It stays on screen until you restart.');
+    loadStorage();
+  });
+  $('data-restart').addEventListener('click', () => window.pywebview.api.restart_app());
+
+  window.addEventListener('pywebviewready', loadStorage);
   window.addEventListener('pywebviewready', loadSettings);
 </script>
 </body>

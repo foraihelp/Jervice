@@ -195,7 +195,19 @@ class Config:
 
     @property
     def memory_file(self) -> Path:
-        return PROJECT_ROOT / self.raw["memory"]["file"]
+        from jarvis import storage
+
+        return storage.memory_file()
+
+    @property
+    def storage_data_dir(self) -> str:
+        """The folder the user wants Jarvis to keep its data in ("" = the default)."""
+        return str((self.raw.get("storage") or {}).get("data_dir") or "").strip()
+
+    @property
+    def storage_active_dir(self) -> str:
+        """The folder Jarvis was actually using last time (see jarvis/storage.py)."""
+        return str((self.raw.get("storage") or {}).get("active_dir") or "").strip()
 
     @property
     def server_enabled(self) -> bool:
@@ -306,6 +318,20 @@ def load_config() -> Config:
         set_key(str(env_path), "JARVIS_API_TOKEN", api_token)
 
     return Config(raw=raw, anthropic_api_key=api_key, openai_api_key=openai_api_key, api_token=api_token)
+
+
+def update_config_value(section: str, key: str, value: Any) -> None:
+    """Sets one value in config.yaml, keeping the file's comments and layout."""
+    from ruamel.yaml import YAML
+
+    yaml_rt = YAML()
+    yaml_rt.preserve_quotes = True
+    config_path = PROJECT_ROOT / "config.yaml"
+    with open(config_path, "r", encoding="utf-8") as f:
+        data = yaml_rt.load(f)
+    data.setdefault(section, {})[key] = value
+    with open(config_path, "w", encoding="utf-8") as f:
+        yaml_rt.dump(data, f)
 
 
 def save_settings(payload: dict[str, Any]) -> None:

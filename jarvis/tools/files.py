@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from jarvis.config import PROJECT_ROOT
+from jarvis import storage
 
 logger = logging.getLogger("jarvis.tools.files")
 
@@ -35,7 +35,11 @@ MAX_LISTED = 40
 MAX_ORGANIZE_FILES = 5000
 _RECENT_SECONDS = 120  # a file touched this recently may still be downloading or open
 
-UNDO_LOG = PROJECT_ROOT / "data" / "last_organize.json"
+UNDO_LOG: Optional[Path] = None   # normally the data folder's last_organize.json (see storage.py)
+
+
+def _undo_path() -> Path:
+    return UNDO_LOG or storage.undo_file()
 
 CATEGORIES: dict[str, set[str]] = {
     "Documents": {".pdf", ".doc", ".docx", ".txt", ".rtf", ".odt", ".xls", ".xlsx", ".csv", ".ppt", ".pptx", ".md"},
@@ -257,8 +261,9 @@ def organize_folder(path: str, keep_originals: bool = False, dry_run: bool = Tru
             failures.append(f"{src.name} ({exc.strerror or exc})")
 
     if done:
-        UNDO_LOG.parent.mkdir(parents=True, exist_ok=True)
-        UNDO_LOG.write_text(json.dumps({"copied": keep_originals, "items": done}, indent=1), encoding="utf-8")
+        undo = _undo_path()
+        undo.parent.mkdir(parents=True, exist_ok=True)
+        undo.write_text(json.dumps({"copied": keep_originals, "items": done}, indent=1), encoding="utf-8")
 
     result = f"{'Copied' if keep_originals else 'Moved'} {len(done)} files in {folder} into sub-folders: {summary}.{note}"
     if failures:
@@ -269,7 +274,7 @@ def organize_folder(path: str, keep_originals: bool = False, dry_run: bool = Tru
 def undo_organize() -> str:
     """Puts back the files moved by the last organize_folder (or removes the copies it made)."""
     try:
-        record = json.loads(UNDO_LOG.read_text(encoding="utf-8"))
+        record = json.loads(_undo_path().read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError):
         return "There is nothing to undo."
 
@@ -296,7 +301,7 @@ def undo_organize() -> str:
         except OSError:
             pass
     if not problems:
-        UNDO_LOG.unlink(missing_ok=True)
+        _undo_path().unlink(missing_ok=True)
     what = "Removed the copies of" if record["copied"] else "Put back"
     return f"{what} {restored} files." + (f" {len(problems)} problems: " + "; ".join(problems[:5]) + "." if problems else "")
 
@@ -370,8 +375,8 @@ _INVALID_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 MAX_FILE_CHARS = 200_000
 
 
-def create_text_file(filename: str, content: str, folder: str = "Documents", open_in_notepad: bool = True) -> str:
-    """Saves `content` as a new text file (in Documents unless told otherwise) and opens it in
+def create_text_file(filename: str, content: str, folder: str = "", open_in_notepad: bool = True) -> str:
+    """Saves `content` as a new text file (in Jarvis's own documents folder unless told otherwise) and opens it in
     Notepad. Never overwrites: a name that is taken gets a "(1)" suffix. Plain text formats only,
     inside the user's profile."""
     if not content or not content.strip():
@@ -387,12 +392,14 @@ def create_text_file(filename: str, content: str, folder: str = "Documents", ope
         return "I only create plain text files (.txt, .md, .csv...) and Word documents (.docx), not programs or scripts."
 
     try:
-        directory = resolve_folder(folder or "Documents")
+        directory = resolve_folder(folder) if (folder or "").strip() else storage.documents_dir()
     except ValueError as exc:
         return str(exc)
     home = Path.home().resolve()
-    if directory != home and home not in directory.parents:
-        return "I only save files inside your user folder, like Documents or Desktop."
+    data = storage.data_dir().resolve()
+    inside_data = directory == data or data in directory.parents
+    if directory != home and home not in directory.parents and not inside_data:
+        return "I only save files inside your user folder or Jarvis's data folder."
 
     dest = _free_name(directory, name)
     try:

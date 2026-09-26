@@ -19,6 +19,7 @@ from typing import Any, Optional
 
 logger = logging.getLogger("jarvis.ui")
 
+from jarvis import history, storage
 from jarvis.brain.streaming import respond_speaking
 
 if getattr(sys, "frozen", False):
@@ -59,8 +60,13 @@ class JarvisAPI:
         else:
             connections.append("Remote API · disabled")
 
+        earlier = history.recent()
         return {
-            "messages": [],  # the visible transcript starts fresh each launch; the brain's own memory persists regardless (data/memory.json)
+            # What was said last time, so it is still there after a restart.
+            "messages": (
+                [{"role": "system", "text": "Earlier conversation"}, *earlier, {"role": "system", "text": "New session"}]
+                if earlier else []
+            ),
             "model": self.config.brain_model,
             "connections": connections,
             "recent_tools": registry.get_recent_calls(6),
@@ -86,6 +92,7 @@ class JarvisAPI:
     def send_command(self, text: str) -> dict[str, Any]:
         from jarvis.tools import registry
 
+        history.add("user", text)
         before = registry.call_count()
         reply = respond_speaking(
             self.brain_holder.brain, text, self.speaker, _BRAIN_ERROR_REPLY,
@@ -93,6 +100,7 @@ class JarvisAPI:
         )
         after = registry.call_count()
         tools = registry.get_recent_calls(after - before) if after > before else []
+        history.add("jarvis", reply, tools)
         return {"reply": reply, "tools": tools}
 
     def trigger_listen(self) -> dict[str, Any]:
@@ -124,6 +132,7 @@ class JarvisAPI:
         if not text:
             return {"heard": "", "reply": "", "tools": []}
 
+        history.add("user", text)
         before = registry.call_count()
         reply = respond_speaking(
             self.brain_holder.brain, text, self.speaker, _BRAIN_ERROR_REPLY,
@@ -131,6 +140,7 @@ class JarvisAPI:
         )
         after = registry.call_count()
         tools = registry.get_recent_calls(after - before) if after > before else []
+        history.add("jarvis", reply, tools)
         return {"heard": text, "reply": reply, "tools": tools}
 
     def stop_speaking(self) -> None:
@@ -209,6 +219,56 @@ class SettingsAPI:
             "anthropic_api_key": self.config.anthropic_api_key,
             "openai_api_key": self.config.openai_api_key,
         }
+
+    # ---------------------------------------------------------------- data folder
+
+    def get_storage(self) -> dict[str, Any]:
+        """The folder in use, and the one that takes over at the next start, if it differs."""
+        from jarvis.config import load_config
+
+        info = storage.describe()
+        wanted = load_config().storage_data_dir
+        info["pending_path"] = wanted if wanted and os.path.normcase(wanted) != os.path.normcase(info["path"]) else ""
+        return info
+
+    def choose_data_folder(self) -> str:
+        """Shows Windows' folder picker (it has a "Make New Folder" button) and returns the choice."""
+        import webview
+
+        try:
+            picked = self.window.create_file_dialog(webview.FileDialog.FOLDER, directory=str(storage.data_dir().parent))
+        except Exception:
+            logger.exception("Could not show the folder picker")
+            return ""
+        return str(picked[0]) if picked else ""
+
+    def set_data_folder(self, path: str) -> dict[str, Any]:
+        try:
+            result = storage.request_folder(path)
+        except ValueError as exc:
+            return {"ok": False, "message": str(exc)}
+        return {"ok": True, **result}
+
+    def rename_data_folder(self, new_name: str) -> dict[str, Any]:
+        try:
+            result = storage.request_rename(new_name)
+        except ValueError as exc:
+            return {"ok": False, "message": str(exc)}
+        return {"ok": True, **result}
+
+    def open_data_folder(self) -> None:
+        try:
+            os.startfile(str(storage.data_dir()))  # type: ignore[attr-defined]
+        except OSError:
+            logger.exception("Could not open the data folder")
+
+    def clear_history(self) -> None:
+        history.clear()
+
+    def restart_app(self) -> None:
+        from jarvis.restart import restart
+
+        restart()
 
     def list_audio_output_devices(self) -> list[str]:
         """Lists this PC's actual available playback devices (by SAPI5's
