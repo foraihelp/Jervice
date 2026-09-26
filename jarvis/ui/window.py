@@ -329,6 +329,7 @@ def create_main_window(brain_holder, transcriber, config, tray, wake_word_listen
         frameless=True,
         easy_drag=False,
         resizable=True,
+        text_select=True,  # pywebview blocks selecting/copying text unless this is set
         min_size=(860, 560),
     )
     api.window = window
@@ -372,6 +373,7 @@ def open_settings_window(config, brain_holder, wake_word_listener=None, speaker=
         frameless=True,
         easy_drag=False,
         resizable=True,
+        text_select=True,
     )
     api.window = window
 
