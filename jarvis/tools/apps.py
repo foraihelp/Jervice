@@ -38,6 +38,8 @@ from typing import Optional
 
 import psutil
 
+from jarvis.tools import files
+
 logger = logging.getLogger("jarvis.tools.apps")
 
 # Letters, digits, spaces, and a few characters real app names use. Anything with
@@ -53,7 +55,30 @@ _START_MENU_DIRS = [
     Path(os.environ.get("ProgramData", r"C:\ProgramData")) / "Microsoft" / "Windows" / "Start Menu" / "Programs",
     Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs",
 ]
-_DESKTOP_DIRS = [Path(os.environ.get("PUBLIC", r"C:\Users\Public")) / "Desktop", Path.home() / "Desktop"]
+def _desktop_dirs() -> list[Path]:
+    """The Desktop folders of whoever is logged in on this PC: the shared one, the user's own,
+    and wherever Windows really keeps it (OneDrive often moves it)."""
+    dirs = [Path(os.environ.get("PUBLIC", r"C:\Users\Public")) / "Desktop", Path.home() / "Desktop"]
+    real = files._known_folder("desktop")
+    if real is not None and real not in dirs:
+        dirs.append(real)
+    return dirs
+
+
+_DESKTOP_DIRS = _desktop_dirs()
+
+# Where programs live when they have no Start menu entry or registry record (portable apps, plug-in
+# bundles, tools unzipped into a folder). Searched only when nothing else matches.
+_SCAN_SKIP_STEMS = ("unins", "uninstall", "setup", "install", "update", "updater", "crash", "helper", "redist",
+                    "vcredist", "dotnet", "diagnostic", "report", "service", "host", "elevate", "launcher_")
+_SCAN_MAX_DEPTH = 9
+_SCAN_SKIP_DIRS = {"windowsapps", "windows defender", "windows nt", "windowspowershell", "dotnet", "modifiableWindowsApps".lower(),
+                   "installer", "cache", "temp", "logs", "crashpad", "crashes", "node_modules", "__pycache__", "assets",
+                   "microsoft shared", "reference assemblies", "msbuild", "windows kits", "package cache"}
+_GENERIC_DIRS = {"bin", "x64", "x86", "win64", "win32", "app", "application", "release", "resources", "lib", "program",
+                 "programs", "mochaui", "plugins", "common files", "files", "core", "main"}
+_SCAN_MAX_DIRS = 25000
+_SCAN_TTL_SECONDS = 600
 
 # Entries that sit next to an app but aren't the app.
 _NOT_THE_APP = ("uninstall", "readme", "release notes", "user guide", "userguide", "manual", "manuals",
@@ -67,7 +92,7 @@ _ALIASES = {
     "media player": "media player", "notes": "sticky notes", "snip": "snipping tool",
     "task mgr": "task manager", "devtools": "visual studio code",
 }
-_SOURCE_PRIORITY = {"start": 0, "shortcut": 1, "programs": 2, "apppaths": 3}
+_SOURCE_PRIORITY = {"start": 0, "shortcut": 1, "programs": 2, "apppaths": 3, "scan": 4}
 _FUZZY_MIN_RATIO = 0.86
 _LAUNCH_CONFIRM_SECONDS = 8
 _INDEX_TTL_SECONDS = 300
@@ -202,6 +227,86 @@ def _programs_entries() -> list[AppEntry]:
     return entries
 
 
+def _looks_like_a_name(text: str) -> bool:
+    """Not a version number ("153.0.4234.48"), a hash or a bare symbol."""
+    return sum(c.isalpha() for c in text) >= 3 and not re.fullmatch(r"[\d._\- ]+", text)
+
+
+def _app_folder_name(folder: Path, root: Path) -> Optional[str]:
+    """The folder that names the app an exe belongs to: the nearest ancestor below the install
+    root with a real name (skipping "bin", "x64", version numbers and the like)."""
+    while folder != root and folder.parent != folder:
+        if _looks_like_a_name(folder.name) and folder.name.lower() not in _GENERIC_DIRS:
+            return folder.name
+        folder = folder.parent
+    return None
+
+
+def _scan_roots() -> list[Path]:
+    roots = [os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)"), os.environ.get("ProgramW6432")]
+    local = os.environ.get("LOCALAPPDATA")
+    if local:
+        roots.append(str(Path(local) / "Programs"))
+    seen: set[str] = set()
+    result = []
+    for r in roots:
+        if r and os.path.isdir(r) and os.path.normcase(r) not in seen:
+            seen.add(os.path.normcase(r))
+            result.append(Path(r))
+    return result
+
+
+def _scan_entries() -> list[AppEntry]:
+    """Programs found by looking inside the usual install folders: an .exe named like the
+    app, or sitting in a folder named like it. The last resort, so it is only run when the
+    Start menu, shortcuts and registry all came up empty."""
+    entries: list[AppEntry] = []
+    dirs_seen = 0
+    for root in _scan_roots():
+        stack = [(root, 0)]
+        while stack and dirs_seen < _SCAN_MAX_DIRS:
+            folder, depth = stack.pop()
+            dirs_seen += 1
+            try:
+                with os.scandir(folder) as it:
+                    children = list(it)
+            except OSError:
+                continue
+            for child in children:
+                try:
+                    if child.is_dir(follow_symlinks=False):
+                        if (depth < _SCAN_MAX_DEPTH and not child.name.startswith((".", "$"))
+                                and child.name.lower() not in _SCAN_SKIP_DIRS):
+                            stack.append((Path(child.path), depth + 1))
+                    elif child.name.lower().endswith(".exe"):
+                        stem = Path(child.name).stem
+                        if any(term in stem.lower() for term in _SCAN_SKIP_STEMS):
+                            continue
+                        if _looks_like_a_name(stem):
+                            entries.append(AppEntry(stem, "scan", child.path, child.path))
+                        # A folder named for the app holding an exe with a different name
+                        # ("MochaPro2026\...\mochapro.exe") should match either way.
+                        app_folder = _app_folder_name(folder, root)
+                        if app_folder and _norm(app_folder) != _norm(stem):
+                            entries.append(AppEntry(app_folder, "scan", child.path, child.path))
+                except OSError:
+                    continue
+    return entries
+
+
+_scan_cache: tuple[float, list[AppEntry]] = (0.0, [])
+
+
+def _scanned_apps() -> list[AppEntry]:
+    global _scan_cache
+    stamp, entries = _scan_cache
+    if time.time() - stamp > _SCAN_TTL_SECONDS:
+        entries = _scan_entries()
+        _scan_cache = (time.time(), entries)
+        logger.info("Scanned install folders: %d programs", len(entries))
+    return entries
+
+
 def _build_index() -> list[AppEntry]:
     """Every app we can find, best source first, one entry per name."""
     seen: set[str] = set()
@@ -280,13 +385,18 @@ def find_app(name: str) -> tuple[Optional[AppEntry], list[str], bool]:
     q_compact = "".join(q_words)
     if not q_compact:
         return None, [], False
-    index = get_index()
-
     guessed = False
-    scored = [(s, e) for e in index if (s := _score(e, q_words, q_compact, fuzzy=False)) is not None]
-    if not scored:
-        scored = [(s, e) for e in index if (s := _score(e, q_words, q_compact, fuzzy=True)) is not None]
-        guessed = bool(scored)
+    scored: list[tuple[int, AppEntry]] = []
+    # The Start menu, shortcuts and registry first; only if they know nothing of it, look inside the
+    # install folders (slower, so its result is cached).
+    for pool in (get_index, _scanned_apps):
+        entries = pool()
+        scored = [(s, e) for e in entries if (s := _score(e, q_words, q_compact, fuzzy=False)) is not None]
+        if not scored:
+            scored = [(s, e) for e in entries if (s := _score(e, q_words, q_compact, fuzzy=True)) is not None]
+            guessed = bool(scored)
+        if scored:
+            break
     if not scored:
         return None, [], False
 
@@ -347,7 +457,7 @@ def _launch(entry: AppEntry) -> str:
         if target and not os.path.exists(target):
             return f"I found '{entry.name}', but the program it points to is missing: {target}"
         exe = target if target and target.lower().endswith(".exe") else None
-    elif entry.source in ("apppaths", "programs") and not os.path.exists(entry.launch):
+    elif entry.source in ("apppaths", "programs", "scan") and not os.path.exists(entry.launch):
         return f"I found '{entry.name}', but its program is missing: {entry.launch}"
 
     was_running = bool(exe and _running(exe))

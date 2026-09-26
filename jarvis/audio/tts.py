@@ -27,6 +27,12 @@ _EDGE_VOICES = {
     "hindi": "hi-IN-SwaraNeural",
     "bengali": "bn-IN-TanishaaNeural",
 }
+# SAPI SpeechVoiceSpeakFlags
+_SVS_ASYNC = 1
+_SVS_PURGE_BEFORE_SPEAK = 2
+_SVS_IS_NOT_XML = 16
+_POLL_MS = 50
+
 _EDGE_SAMPLE_RATE = 24000
 _EDGE_TIMEOUT_SECONDS = 20
 
@@ -145,11 +151,6 @@ class Speaker:
             self._pin_output_device(engine, self._output_device)
         self._base_voice = engine.getProperty("voice")
         self._engine = engine
-        # SAPI reports each word as it is spoken, on this thread. That is
-        # where a stop request is honored: pyttsx3's engine (a COM object)
-        # may only be touched from the thread that created it, so stop()
-        # can't call engine.stop() itself from another thread.
-        engine.connect("started-word", self._on_word)
         self._ready.set()
 
         while True:
@@ -166,10 +167,6 @@ class Speaker:
             finally:
                 for _ in range(1 + extra):
                     self._queue.task_done()
-
-    def _on_word(self, name, location, length) -> None:
-        if self._active_gen != self._generation:
-            self._engine.stop()
 
     def _coalesce(self, gen: int, first: str) -> tuple[str, int]:
         """Streamed replies arrive as one sentence at a time. Local Windows
@@ -211,9 +208,20 @@ class Speaker:
                 logger.warning("No installed Windows voice can speak %s and the online voice is unavailable; skipping speech.", lang)
                 return
             engine.setProperty("voice", voice_id)
+        # Speak through the Windows speech COM object directly, not pyttsx3's say()/runAndWait().
+        # runAndWait() speaks the first utterance and then, on every later call, returns after
+        # a fraction of a second having said nothing (measured: an 8-word reply took 3.2 s the
+        # first time, later 19- and 14-word replies took 0.1 s each). Here it is: start speaking
+        # asynchronously, then poll until it finishes. Polling on this same thread is also how a
+        # Stop request is honored, because the COM object may only be used from the thread that
+        # created it.
+        voice = engine.proxy._driver._tts
         try:
-            engine.say(text)
-            engine.runAndWait()
+            voice.Speak(text, _SVS_ASYNC | _SVS_IS_NOT_XML)
+            while not voice.WaitUntilDone(_POLL_MS):
+                if self._active_gen != self._generation:  # Stop was pressed
+                    voice.Speak("", _SVS_ASYNC | _SVS_PURGE_BEFORE_SPEAK)
+                    break
         finally:
             if lang and self._base_voice:
                 engine.setProperty("voice", self._base_voice)
