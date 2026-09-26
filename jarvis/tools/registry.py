@@ -258,11 +258,11 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "create_text_file",
-        "description": "Write a new document for the user: saves the text as a file (in Documents unless told otherwise) and opens it in Notepad. Use this to write a letter, note, list or any text. Never overwrites an existing file.",
+        "description": "Write a new document for the user: saves the text as a file (in Documents unless told otherwise) and opens it. A .txt opens in Notepad; a .docx is a Word document and opens in Word (use .docx when the user asks for Word). Use for a letter, note, list or any text. Never overwrites.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "filename": {"type": "string", "description": "File name, e.g. 'leave_application.txt'."},
+                "filename": {"type": "string", "description": "File name, e.g. 'leave_application.txt', or .docx for Word."},
                 "content": {"type": "string", "description": "The full text of the document."},
                 "folder": {"type": "string", "description": "Folder name or path. Default Documents."},
             },

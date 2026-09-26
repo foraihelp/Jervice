@@ -18,6 +18,8 @@ import shutil
 import subprocess
 import time
 import uuid
+import zipfile
+from xml.sax.saxutils import escape
 from ctypes import wintypes
 from datetime import datetime
 from pathlib import Path
@@ -300,6 +302,70 @@ def undo_organize() -> str:
 
 
 _TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".html", ".htm", ".xml", ".log", ".ini", ".yaml", ".yml"}
+_DOCX_EXTENSION = ".docx"
+_DOCX_OPEN_SECONDS = 25   # Word is slow to start
+
+_DOCX_PARTS = {
+    "[Content_Types].xml": (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
+        '<Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>'
+        '</Types>'
+    ),
+    "_rels/.rels": (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+        '</Relationships>'
+    ),
+    "word/_rels/document.xml.rels": (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+        '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>'
+        '</Relationships>'
+    ),
+    # Declares the current Word format, so the title bar doesn't say "Compatibility Mode".
+    "word/settings.xml": (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:compat>'
+        '<w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/>'
+        '</w:compat></w:settings>'
+    ),
+    # Calibri 11 with Word's usual paragraph spacing, so the letter looks like a normal Word document.
+    "word/styles.xml": (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Mangal" w:eastAsia="Calibri"/>'
+        '<w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:rPrDefault>'
+        '<w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="259" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>'
+        '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>'
+        '</w:styles>'
+    ),
+}
+
+
+def _write_docx(path: Path, content: str) -> None:
+    """A real .docx (Word document) with one paragraph per line. Built by hand from the Office
+    Open XML format, so no extra library is needed."""
+    paragraphs = "".join(
+        '<w:p><w:r><w:t xml:space="preserve">%s</w:t></w:r></w:p>' % escape(line) if line.strip() else "<w:p/>"
+        for line in content.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    )
+    document = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'
+        + paragraphs + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr>'
+        '</w:body></w:document>'
+    )
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+        for part, xml in _DOCX_PARTS.items():
+            z.writestr(part, xml)
+        z.writestr("word/document.xml", document)
 _INVALID_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 MAX_FILE_CHARS = 200_000
 
@@ -316,8 +382,9 @@ def create_text_file(filename: str, content: str, folder: str = "Documents", ope
     name = _INVALID_FILENAME_CHARS.sub("", Path((filename or "").strip()).name).strip(" .") or "note.txt"
     if not Path(name).suffix:
         name += ".txt"
-    if Path(name).suffix.lower() not in _TEXT_EXTENSIONS:
-        return "I only create plain text files (.txt, .md, .csv, .json, .html...), not programs or scripts."
+    is_docx = Path(name).suffix.lower() == _DOCX_EXTENSION
+    if not is_docx and Path(name).suffix.lower() not in _TEXT_EXTENSIONS:
+        return "I only create plain text files (.txt, .md, .csv...) and Word documents (.docx), not programs or scripts."
 
     try:
         directory = resolve_folder(folder or "Documents")
@@ -329,10 +396,13 @@ def create_text_file(filename: str, content: str, folder: str = "Documents", ope
 
     dest = _free_name(directory, name)
     try:
-        # A byte-order mark makes older Notepad versions read non-English text correctly.
-        is_txt = dest.suffix.lower() == ".txt"
-        with open(dest, "w", encoding="utf-8-sig" if is_txt else "utf-8", newline="\r\n" if is_txt else "\n") as f:
-            f.write(content)
+        if is_docx:
+            _write_docx(dest, content)
+        else:
+            # A byte-order mark makes older Notepad versions read non-English text correctly.
+            is_txt = dest.suffix.lower() == ".txt"
+            with open(dest, "w", encoding="utf-8-sig" if is_txt else "utf-8", newline="\r\n" if is_txt else "\n") as f:
+                f.write(content)
     except OSError as exc:
         return f"I couldn't save the file: {exc.strerror or exc}"
 
@@ -344,15 +414,19 @@ def create_text_file(filename: str, content: str, folder: str = "Documents", ope
 
     from jarvis.tools import windows_control
 
+    viewer = "Word" if is_docx else "Notepad"
     try:
-        subprocess.Popen(["notepad.exe", str(dest)])
+        if is_docx:
+            os.startfile(str(dest))  # type: ignore[attr-defined]  -- whatever the PC uses for .docx (Word)
+        else:
+            subprocess.Popen(["notepad.exe", str(dest)])
     except OSError as exc:
-        return result + f", but I couldn't open Notepad: {exc.strerror or exc}"
-    hwnd = windows_control.wait_for_window(dest.stem, timeout=8)
+        return result + f", but I couldn't open it in {viewer}: {exc.strerror or exc}"
+    hwnd = windows_control.wait_for_window(dest.stem, timeout=_DOCX_OPEN_SECONDS if is_docx else 8)
     if hwnd is None:
-        return result + ". I started Notepad, but its window has not appeared yet."
+        return result + f". I started {viewer}, but its window has not appeared yet."
     windows_control.force_foreground(hwnd)
-    return result + " and opened it in Notepad."
+    return result + f" and opened it in {viewer}."
 
 
 def open_file(path: str) -> str:
