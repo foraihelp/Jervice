@@ -19,7 +19,7 @@ logger = logging.getLogger("jarvis.tools.registry")
 TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "name": "open_app",
-        "description": "Open/launch an application by the name you would see in the Windows Start menu, e.g. 'notepad', 'chrome', 'Mocha Pro', 'Calculator', or open a file or folder by full path. It tells you whether the app was really found and started. It only opens things: it cannot run commands, scripts or PowerShell, or pass options to a program.",
+        "description": "Open/launch an application by the name you would see in the Windows Start menu, e.g. 'notepad', 'chrome', 'Mocha Pro', 'Calculator', or open a file or folder by full path. It works for any installed app or Store app, and tells you whether it was really found and started. If several apps match, it lists them: ask the user which one instead of guessing. It only opens things: it cannot run commands, scripts or PowerShell, or pass options to a program.",
         "input_schema": {
             "type": "object",
             "properties": {"name": {"type": "string", "description": "Application name or path to launch."}},

@@ -1,28 +1,38 @@
 """Open and close applications on Windows.
 
-`open_app` finds an app the way the Windows Start menu does: an executable or
-App Paths name (`os.startfile`, like the Run box), then a Start Menu shortcut
-(apps installed as plug-in bundles, like Boris FX Mocha Pro, are only reachable
-this way), then anything on PATH, then Microsoft Store apps. It opens things; it
-does not run commands.
+`open_app` opens anything installed, the way you would by typing its name into the
+Start menu. It builds an index of every app Windows knows about and matches what
+you said against it, tolerantly (word order, a missing "Microsoft"/"Adobe", a
+speech-recognition slip like "Mokha Pro"):
 
-It also reports what really happened. An earlier version fell back to
-`cmd /c start`, which reported success the moment cmd itself started, even for
-a bogus name or a whole PowerShell script the AI model passed in as the "app
-name" -- so a task could silently do nothing while being reported as done. Now a
-missing app, a broken shortcut, and an app that never appeared are all said out
-loud.
+  1. The Start menu's own app list (`Get-StartApps`): desktop programs *and*
+     Microsoft Store apps. This is what Start search uses.
+  2. Start Menu and Desktop shortcuts (.lnk).
+  3. Programs registered with Windows under "App Paths".
+  4. The installed-programs list (Add/Remove Programs), for apps that have no
+     shortcut at all.
+
+It opens things; it does not run commands. And it reports what really happened.
+An earlier version fell back to `cmd /c start`, which said "Opened" the moment cmd
+itself started, even for a bogus name or a PowerShell script the AI model passed in
+as the "app name", so a task could silently do nothing while being reported as done.
+Now a missing app, a broken shortcut, an ambiguous name, and an app that never
+appeared are all said out loud.
 """
 
 from __future__ import annotations
 
+import difflib
 import json
 import logging
 import os
 import re
 import shutil
 import subprocess
+import threading
 import time
+import winreg
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -43,99 +53,270 @@ _START_MENU_DIRS = [
     Path(os.environ.get("ProgramData", r"C:\ProgramData")) / "Microsoft" / "Windows" / "Start Menu" / "Programs",
     Path(os.environ.get("APPDATA", "")) / "Microsoft" / "Windows" / "Start Menu" / "Programs",
 ]
-# Shortcuts that sit next to an app but aren't the app.
-_NOT_THE_APP = ("uninstall", "readme", "release notes", "user guide", "userguide", "manual", "help",
-                "documentation", "license", "website", "support", "changelog", "what s new")
+_DESKTOP_DIRS = [Path(os.environ.get("PUBLIC", r"C:\Users\Public")) / "Desktop", Path.home() / "Desktop"]
+
+# Entries that sit next to an app but aren't the app.
+_NOT_THE_APP = ("uninstall", "readme", "release notes", "user guide", "userguide", "manual", "manuals",
+                "documentation", "website", "changelog", "what s new", "bug report", "links")
+_FILLER_WORDS = {"the", "app", "application", "program", "software", "please", "my"}
+# What people call things, mapped to what Windows calls them.
+_ALIASES = {
+    "vs code": "visual studio code", "vscode": "visual studio code", "ppt": "powerpoint",
+    "ae": "after effects", "aftereffects": "after effects", "explorer": "file explorer",
+    "cmd": "command prompt", "powershell": "windows powershell", "browser": "chrome",
+    "media player": "media player", "notes": "sticky notes", "snip": "snipping tool",
+    "task mgr": "task manager", "devtools": "visual studio code",
+}
+_SOURCE_PRIORITY = {"start": 0, "shortcut": 1, "programs": 2, "apppaths": 3}
+_FUZZY_MIN_RATIO = 0.86
 _LAUNCH_CONFIRM_SECONDS = 8
-_STORE_APPS_TTL = 600
-_store_apps_cache: tuple[float, list[dict]] = (0.0, [])
+_INDEX_TTL_SECONDS = 300
+_REBUILD_ON_MISS_AFTER = 30
+
+
+@dataclass
+class AppEntry:
+    name: str
+    source: str            # "start" | "shortcut" | "apppaths" | "programs"
+    launch: str            # what to hand to os.startfile
+    exe: Optional[str] = None
+    norm: str = field(init=False)
+    words: list[str] = field(init=False)
+    compact: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.words = _words(self.name)
+        self.norm = " ".join(self.words)
+        self.compact = "".join(self.words)
 
 
 def _norm(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
 
 
-def _rank(candidate: str, query: str, words: list[str]) -> Optional[int]:
-    """0 = same name, 1 = starts with it, 2 = contains all its words, None = no match."""
-    if candidate == query:
+def _is_extra(name: str) -> bool:
+    """A manual, uninstaller, release-notes link and the like, not the app itself.
+    Whole words only, so "Get Help" or "Foundry License Utility" are not caught."""
+    padded = f" {_norm(name)} "
+    return any(f" {term} " in padded for term in _NOT_THE_APP)
+
+
+def _words(text: str) -> list[str]:
+    """Comparable words: lower-case, no punctuation, no leading 'Microsoft'/'MS'."""
+    words = _norm(text).split()
+    while words and words[0] in ("microsoft", "ms"):
+        words = words[1:]
+    return words
+
+
+# ---------------------------------------------------------------------- the index
+
+
+def _powershell(command: str, timeout: int = 20) -> str:
+    try:
+        return subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
+            capture_output=True, text=True, timeout=timeout, creationflags=subprocess.CREATE_NO_WINDOW,
+        ).stdout
+    except Exception:  # noqa: BLE001
+        logger.debug("PowerShell command failed: %s", command[:60], exc_info=True)
+        return ""
+
+
+def _start_apps() -> list[AppEntry]:
+    try:
+        data = json.loads(_powershell("Get-StartApps | ConvertTo-Json -Compress") or "[]")
+    except json.JSONDecodeError:
+        return []
+    entries = []
+    for app in data if isinstance(data, list) else [data]:
+        name, app_id = str(app.get("Name") or ""), str(app.get("AppID") or "")
+        if name and app_id:
+            exe = app_id if app_id.lower().endswith(".exe") and os.path.exists(app_id) else None
+            entries.append(AppEntry(name, "start", "shell:AppsFolder\\" + app_id, exe))
+    return entries
+
+
+def _shortcut_entries() -> list[AppEntry]:
+    entries = []
+    for folder in _START_MENU_DIRS + _DESKTOP_DIRS:
+        if not folder.is_dir():
+            continue
+        try:
+            for lnk in folder.rglob("*.lnk"):
+                entries.append(AppEntry(lnk.stem, "shortcut", str(lnk)))
+        except OSError:
+            continue
+    return entries
+
+
+def _registry_values(hive: int, path: str, view: int = 0) -> list[tuple[str, dict]]:
+    """(subkey name, its values) for every subkey of `path`."""
+    rows = []
+    try:
+        with winreg.OpenKey(hive, path, 0, winreg.KEY_READ | view) as root:
+            for i in range(winreg.QueryInfoKey(root)[0]):
+                sub = winreg.EnumKey(root, i)
+                values = {}
+                try:
+                    with winreg.OpenKey(root, sub) as key:
+                        for j in range(winreg.QueryInfoKey(key)[1]):
+                            name, value, _ = winreg.EnumValue(key, j)
+                            values[name] = value
+                except OSError:
+                    continue
+                rows.append((sub, values))
+    except OSError:
+        pass
+    return rows
+
+
+def _app_paths_entries() -> list[AppEntry]:
+    entries = []
+    base = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths"
+    for hive in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+        for sub, values in _registry_values(hive, base):
+            exe = str(values.get("") or "").strip().strip('"')
+            if sub.lower().endswith(".exe") and exe.lower().endswith(".exe") and os.path.exists(exe):
+                entries.append(AppEntry(Path(sub).stem, "apppaths", exe, exe))
+    return entries
+
+
+def _programs_entries() -> list[AppEntry]:
+    entries = []
+    base = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+    sources = [
+        (winreg.HKEY_LOCAL_MACHINE, base, winreg.KEY_WOW64_64KEY),
+        (winreg.HKEY_LOCAL_MACHINE, base.replace("SOFTWARE", r"SOFTWARE\WOW6432Node"), 0),
+        (winreg.HKEY_CURRENT_USER, base, 0),
+    ]
+    for hive, path, view in sources:
+        for _, values in _registry_values(hive, path, view):
+            name = str(values.get("DisplayName") or "").strip()
+            icon = str(values.get("DisplayIcon") or "").split(",")[0].strip().strip('"')
+            if (not name or values.get("SystemComponent") == 1 or values.get("ParentKeyName")
+                    or not icon.lower().endswith(".exe") or not os.path.exists(icon)
+                    or "unins" in icon.lower() or "uninstall" in icon.lower()):
+                continue
+            entries.append(AppEntry(name, "programs", icon, icon))
+    return entries
+
+
+def _build_index() -> list[AppEntry]:
+    """Every app we can find, best source first, one entry per name."""
+    seen: set[str] = set()
+    index: list[AppEntry] = []
+    for entry in _start_apps() + _shortcut_entries() + _app_paths_entries() + _programs_entries():
+        if not entry.norm or _is_extra(entry.name):
+            continue
+        if entry.compact in seen:   # "Live captions" and "LiveCaptions" are one app
+            continue
+        seen.add(entry.compact)
+        index.append(entry)
+    return index
+
+
+_index: list[AppEntry] = []
+_index_time = 0.0
+_index_lock = threading.Lock()
+
+
+def get_index(force: bool = False) -> list[AppEntry]:
+    global _index, _index_time
+    with _index_lock:
+        if force or not _index or time.time() - _index_time > _INDEX_TTL_SECONDS:
+            _index = _build_index()
+            _index_time = time.time()
+            logger.info("App index built: %d apps", len(_index))
+        return _index
+
+
+def warm_index() -> None:
+    """Builds the index ahead of time (it takes a couple of seconds), so the first
+    "open ..." request doesn't wait for it. Safe to call from a background thread."""
+    try:
+        get_index()
+    except Exception:  # noqa: BLE001
+        logger.debug("Could not warm the app index", exc_info=True)
+
+
+# ------------------------------------------------------------------- matching
+
+
+def _clean_query(name: str) -> list[str]:
+    words = [w for w in _words(name) if w not in _FILLER_WORDS] or _words(name)
+    alias = _ALIASES.get(" ".join(words)) or _ALIASES.get("".join(words))
+    return alias.split() if alias else words
+
+
+def _score(entry: AppEntry, q_words: list[str], q_compact: str, fuzzy: bool) -> Optional[int]:
+    """0 same name; 1 starts with it; 2 every word you said begins a word of the name;
+    3 every word of the name is in what you said; 4 (only if `fuzzy`) close spelling,
+    which is what a speech-recognition slip looks like."""
+    if not entry.words:
+        return None
+    if entry.words == q_words or entry.compact == q_compact:
         return 0
-    if candidate.startswith(query):
+    query = " ".join(q_words)
+    if entry.norm.startswith(query + " ") or (len(q_compact) >= 4 and entry.compact.startswith(q_compact)):
         return 1
-    if words and all(w in candidate for w in words):
+    if all(any(w.startswith(qw) for w in entry.words) for qw in q_words):
         return 2
+    if any(len(w) >= 3 for w in entry.words) and all(w in q_words for w in entry.words):
+        return 3
+    # Only a whole-name near miss ("Mokha Pro" for "Mocha Pro"). Being looser opens the wrong
+    # app for one that isn't installed ("Photoshop" scores 0.8 against "Photos").
+    if fuzzy and len(q_compact) >= 5 and difflib.SequenceMatcher(None, entry.compact, q_compact).ratio() >= _FUZZY_MIN_RATIO:
+        return 4
     return None
 
 
-def _find_shortcut(name: str) -> Optional[Path]:
-    """The Start Menu shortcut that best matches `name`, the way the Windows Start
-    menu would find it."""
-    query = _norm(name)
-    if not query:
-        return None
-    words = query.split()
-    asked_for_extras = any(term in query for term in _NOT_THE_APP)
-    best: Optional[tuple[tuple[int, int], Path]] = None
-    for folder in _START_MENU_DIRS:
-        if not folder.is_dir():
-            continue
-        for lnk in folder.rglob("*.lnk"):
-            stem = _norm(lnk.stem)
-            if not asked_for_extras and any(term in stem for term in _NOT_THE_APP):
-                continue
-            rank = _rank(stem, query, words)
-            if rank is None:
-                continue
-            key = (rank, len(stem))
-            if best is None or key < best[0]:
-                best = (key, lnk)
-    return best[1] if best else None
+def find_app(name: str) -> tuple[Optional[AppEntry], list[str], bool]:
+    """(app, choices, guessed). `app` is what to open for `name`. If several apps fit
+    equally well, `app` is None and `choices` lists them for the user to pick from. If
+    nothing fits, both are empty. `guessed` is True when the match was by similar
+    spelling rather than by name, so the caller can say so."""
+    q_words = _clean_query(name)
+    q_compact = "".join(q_words)
+    if not q_compact:
+        return None, [], False
+    index = get_index()
+
+    guessed = False
+    scored = [(s, e) for e in index if (s := _score(e, q_words, q_compact, fuzzy=False)) is not None]
+    if not scored:
+        scored = [(s, e) for e in index if (s := _score(e, q_words, q_compact, fuzzy=True)) is not None]
+        guessed = bool(scored)
+    if not scored:
+        return None, [], False
+
+    best = min(s for s, _ in scored)
+    tied = sorted((e for s, e in scored if s == best), key=lambda e: len(e.norm))
+    if len(tied) == 1 or all(e.norm.startswith(tied[0].norm) for e in tied):
+        return tied[0], [], guessed  # one match, or versions/variants of the same app: take the plainest name
+    # The same app often appears from several places (a Start entry plus a bare
+    # program name); if exactly one candidate comes from the most trustworthy
+    # source, that is the one meant.
+    top = min(_SOURCE_PRIORITY[e.source] for e in tied)
+    preferred = [e for e in tied if _SOURCE_PRIORITY[e.source] == top]
+    if len(preferred) == 1 and top < max(_SOURCE_PRIORITY[e.source] for e in tied):
+        return preferred[0], [], guessed
+    return None, [e.name for e in tied[:5]], False
 
 
-def _shortcut_target(lnk: Path) -> Optional[str]:
-    """Where a shortcut points, or None if that can't be read."""
-    quoted = str(lnk).replace("'", "''")  # PowerShell single-quoted string: only ' needs escaping
-    try:
-        result = subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
-             f"(New-Object -ComObject WScript.Shell).CreateShortcut('{quoted}').TargetPath"],
-            capture_output=True, text=True, timeout=10, creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-        return result.stdout.strip() or None
-    except Exception:  # noqa: BLE001
-        logger.debug("Could not read shortcut %s", lnk, exc_info=True)
-        return None
+def _did_you_mean(name: str) -> list[str]:
+    q = "".join(_clean_query(name))
+    names = {e.compact: e.name for e in get_index()}
+    return [names[c] for c in difflib.get_close_matches(q, list(names), n=3, cutoff=0.6)]
 
 
-def _find_store_app(name: str) -> Optional[dict]:
-    """A Microsoft Store / packaged app from the Start menu's app list (Calculator,
-    Photos, ...). These have no .exe or .lnk to open."""
-    global _store_apps_cache
-    stamp, apps = _store_apps_cache
-    if time.time() - stamp > _STORE_APPS_TTL:
-        try:
-            result = subprocess.run(
-                ["powershell", "-NoProfile", "-NonInteractive", "-Command", "Get-StartApps | ConvertTo-Json -Compress"],
-                capture_output=True, text=True, timeout=15, creationflags=subprocess.CREATE_NO_WINDOW,
-            )
-            data = json.loads(result.stdout or "[]")
-            apps = data if isinstance(data, list) else [data]
-        except Exception:  # noqa: BLE001
-            logger.debug("Get-StartApps failed", exc_info=True)
-            apps = []
-        _store_apps_cache = (time.time(), apps)
+# -------------------------------------------------------------------- launching
 
-    query = _norm(name)
-    words = query.split()
-    best: Optional[tuple[tuple[int, int], dict]] = None
-    for app in apps:
-        app_name = _norm(str(app.get("Name", "")))
-        rank = _rank(app_name, query, words)
-        if rank is None:
-            continue
-        key = (rank, len(app_name))
-        if best is None or key < best[0]:
-            best = (key, app)
-    return best[1] if best else None
+
+def _shortcut_target(lnk: str) -> Optional[str]:
+    quoted = lnk.replace("'", "''")  # PowerShell single-quoted string: only ' needs escaping
+    out = _powershell(f"(New-Object -ComObject WScript.Shell).CreateShortcut('{quoted}').TargetPath", timeout=10)
+    return out.strip() or None
 
 
 def _running(exe: str) -> bool:
@@ -159,8 +340,30 @@ def _appeared(exe: str) -> bool:
     return _running(exe)
 
 
+def _launch(entry: AppEntry) -> str:
+    exe = entry.exe
+    if entry.source == "shortcut":
+        target = _shortcut_target(entry.launch)
+        if target and not os.path.exists(target):
+            return f"I found '{entry.name}', but the program it points to is missing: {target}"
+        exe = target if target and target.lower().endswith(".exe") else None
+    elif entry.source in ("apppaths", "programs") and not os.path.exists(entry.launch):
+        return f"I found '{entry.name}', but its program is missing: {entry.launch}"
+
+    was_running = bool(exe and _running(exe))
+    try:
+        os.startfile(entry.launch)  # type: ignore[attr-defined]  (Windows-only)
+    except OSError as exc:
+        logger.warning("Failed to open %s (%s): %s", entry.name, entry.launch, exc)
+        return f"I found '{entry.name}' but couldn't start it: {exc.strerror or exc}"
+    if exe is None or was_running or _appeared(exe):
+        return f"Opened {entry.name}."
+    return (f"I started {entry.name}, but I couldn't confirm that it opened. "
+            "It may still be loading, or it may have failed to start.")
+
+
 def open_app(name: str) -> str:
-    """Opens an application by name (e.g. "notepad", "chrome", "Mocha Pro"), or a
+    """Opens an application by name (e.g. "notepad", "Mocha Pro", "vs code"), or a
     file or folder by path. Returns what actually happened, including failure."""
     name = name.strip().strip('"')
     if not name:
@@ -179,30 +382,36 @@ def open_app(name: str) -> str:
         if any(token.startswith(("-", "/")) for token in name.split()[1:]):
             return _REFUSAL
 
+    if is_path:
+        try:
+            os.startfile(name)  # type: ignore[attr-defined]  (Windows-only)
+            return f"Opened {name}."
+        except OSError as exc:
+            return f"I couldn't open '{name}': {exc.strerror or exc}"
+
+    # Look it up among the installed apps first: that gives a confirmed launch, and asks
+    # instead of guessing when several apps fit ("git" is Git Bash, Git GUI, Git CMD...).
+    entry, choices, guessed = find_app(name)
+    if entry is None and not choices and time.time() - _index_time > _REBUILD_ON_MISS_AFTER:
+        get_index(force=True)             # maybe it was installed a moment ago
+        entry, choices, guessed = find_app(name)
+    if choices:
+        return f"Several apps match '{name}': " + ", ".join(choices) + ". Which one should I open?"
+    if entry is not None and not guessed:
+        return _launch(entry)
+
+    # Not an app we know by that name: an executable Windows itself resolves (calc, regedit, mstsc...).
     try:
-        os.startfile(name)  # type: ignore[attr-defined]  (Windows-only)
+        os.startfile(name)  # type: ignore[attr-defined]
         return f"Opened {name}."
     except OSError:
         pass
 
-    # Not an executable or path Windows knows by that name: look it up the way the
-    # Start menu does.
-    shortcut = _find_shortcut(name)
-    if shortcut is not None:
-        target = _shortcut_target(shortcut)
-        if target and not os.path.exists(target):
-            return f"I found '{shortcut.stem}' in the Start menu, but the program it points to is missing: {target}"
-        exe = target if target and target.lower().endswith(".exe") else None
-        was_running = bool(exe and _running(exe))
-        try:
-            os.startfile(str(shortcut))  # type: ignore[attr-defined]
-        except OSError as exc:
-            logger.warning("Failed to open shortcut %s: %s", shortcut, exc)
-            return f"I found '{shortcut.stem}' but couldn't start it: {exc.strerror or exc}"
-        if exe is None or was_running or _appeared(exe):
-            return f"Opened {shortcut.stem}."
-        return (f"I started {shortcut.stem}, but I couldn't confirm that it opened. "
-                "It may still be loading, or it may have failed to start.")
+    if entry is not None:                 # nothing exact, but one close spelling ("Mokha Pro")
+        result = _launch(entry)
+        if result.startswith("Opened"):
+            result += f" (There is no app called '{name}'; that is the closest match.)"
+        return result
 
     found = shutil.which(name) or shutil.which(name + ".exe")
     if found:
@@ -212,15 +421,9 @@ def open_app(name: str) -> str:
         except OSError as exc:
             logger.warning("Failed to open %r (%s): %s", name, found, exc)
 
-    store = _find_store_app(name)
-    if store is not None and store.get("AppID"):
-        try:
-            os.startfile("shell:AppsFolder\\" + str(store["AppID"]))  # type: ignore[attr-defined]
-            return f"Opened {store['Name']}."
-        except OSError as exc:
-            logger.warning("Failed to open store app %r: %s", store, exc)
-
-    return f"I couldn't find an app or file called '{name}'."
+    suggestions = _did_you_mean(name)
+    hint = f" Did you mean: {', '.join(suggestions)}?" if suggestions else ""
+    return f"I couldn't find an app or file called '{name}'.{hint}"
 
 
 def close_app(name: str) -> str:

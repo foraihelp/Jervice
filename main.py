@@ -27,7 +27,7 @@ from jarvis.brain.streaming import respond_speaking
 from jarvis.config import load_config
 from jarvis.server import run_server
 from jarvis.conversation import VoiceConversation
-from jarvis.tools import memory_tools, registry, reminders, safety
+from jarvis.tools import apps, memory_tools, registry, reminders, safety
 from jarvis.tray import TrayApp
 from jarvis.ui.window import (
     create_main_window,
@@ -286,6 +286,8 @@ def main() -> None:
                     break
                 time.sleep(0.5)
 
+    # Index every installed app now (about a second), so the first "open ..." is instant.
+    threading.Thread(target=apps.warm_index, daemon=True).start()
     threading.Thread(target=wake_word_thread, daemon=True).start()
     # The tray icon runs in a background thread (not the main thread) on
     # this build because the main thread is needed for the webview event
