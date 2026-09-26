@@ -20,10 +20,10 @@ import openai
 from openai import OpenAI
 
 from jarvis.brain.context import dynamic_context
-from jarvis.brain import progress
+from jarvis.brain import claims, progress
 from jarvis.brain.memory import Memory
 from jarvis.brain.streaming import SentenceStreamer
-from jarvis.tools.registry import TOOL_SCHEMAS, run_tool
+from jarvis.tools.registry import TOOL_SCHEMAS, call_count, run_tool
 from jarvis.tools.safety import begin_turn, end_turn
 
 logger = logging.getLogger("jarvis.brain")
@@ -175,7 +175,15 @@ class OpenAIBrain:
         return text, tool_calls
 
     def _respond_locked(self, user_text: str, on_sentence: Optional[Callable[[str], None]]) -> str:
-        streamer = SentenceStreamer(on_sentence) if on_sentence else None
+        start_calls = call_count()
+        checked = {"done": False}   # the claim check runs once per request
+
+        def guarded(sentence: str) -> None:
+            if not checked["done"] and call_count() == start_calls and claims.claims_action(sentence):
+                raise claims.UnbackedClaim(sentence)
+            on_sentence(sentence)
+
+        streamer = SentenceStreamer(guarded) if on_sentence else None
         begin_turn(user_text)
         self.memory.add_message("user", user_text)
 
@@ -184,7 +192,18 @@ class OpenAIBrain:
                 {"role": "system", "content": self.system_prompt + dynamic_context(self.memory)},
                 *self.memory.recent_messages(),
             ]
-            text, tool_calls = self._complete(messages, streamer)
+            try:
+                text, tool_calls = self._complete(messages, streamer)
+                if (streamer is None and not tool_calls and not checked["done"] and call_count() == start_calls
+                        and claims.claims_action(text)):
+                    raise claims.UnbackedClaim(text)
+            except claims.UnbackedClaim as claim:
+                logger.warning("Reply claimed an action but no tool ran: %r", claim.sentence)
+                checked["done"] = True
+                self.memory.add_message("assistant", claim.sentence)
+                self.memory.add_message("user", claims.NOTE)
+                streamer = SentenceStreamer(on_sentence) if on_sentence else None
+                continue
 
             if not tool_calls:
                 self.memory.add_message("assistant", text)

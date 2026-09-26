@@ -11,10 +11,11 @@ from typing import Callable, Optional
 
 from anthropic import Anthropic
 
+from jarvis.brain import claims
 from jarvis.brain.context import dynamic_context
 from jarvis.brain.memory import Memory
 from jarvis.brain.streaming import SentenceStreamer
-from jarvis.tools.registry import TOOL_SCHEMAS, run_tool
+from jarvis.tools.registry import TOOL_SCHEMAS, call_count, run_tool
 from jarvis.tools.safety import begin_turn, end_turn
 
 logger = logging.getLogger("jarvis.brain")
@@ -68,12 +69,32 @@ class AnthropicBrain:
         return message
 
     def _respond_locked(self, user_text: str, on_sentence: Optional[Callable[[str], None]]) -> str:
-        streamer = SentenceStreamer(on_sentence) if on_sentence else None
+        start_calls = call_count()
+        checked = {"done": False}   # the claim check runs once per request
+
+        def guarded(sentence: str) -> None:
+            if not checked["done"] and call_count() == start_calls and claims.claims_action(sentence):
+                raise claims.UnbackedClaim(sentence)
+            on_sentence(sentence)
+
+        streamer = SentenceStreamer(guarded) if on_sentence else None
         begin_turn(user_text)
         self.memory.add_message("user", user_text)
 
         for _ in range(MAX_TOOL_ITERATIONS):
-            response = self._create(streamer)
+            try:
+                response = self._create(streamer)
+                if streamer is None and response.stop_reason != "tool_use" and not checked["done"] and call_count() == start_calls:
+                    said = "".join(b.text for b in response.content if b.type == "text")
+                    if claims.claims_action(said):
+                        raise claims.UnbackedClaim(said)
+            except claims.UnbackedClaim as claim:
+                logger.warning("Reply claimed an action but no tool ran: %r", claim.sentence)
+                checked["done"] = True
+                self.memory.add_message("assistant", [{"type": "text", "text": claim.sentence}])
+                self.memory.add_message("user", claims.NOTE)
+                streamer = SentenceStreamer(on_sentence) if on_sentence else None
+                continue
 
             # Plain dicts, not the SDK's block objects: memory is saved as
             # JSON, which can't serialize those, and dicts are accepted

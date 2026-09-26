@@ -13,7 +13,9 @@ import fnmatch
 import json
 import logging
 import os
+import re
 import shutil
+import subprocess
 import time
 import uuid
 from ctypes import wintypes
@@ -295,6 +297,62 @@ def undo_organize() -> str:
         UNDO_LOG.unlink(missing_ok=True)
     what = "Removed the copies of" if record["copied"] else "Put back"
     return f"{what} {restored} files." + (f" {len(problems)} problems: " + "; ".join(problems[:5]) + "." if problems else "")
+
+
+_TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".html", ".htm", ".xml", ".log", ".ini", ".yaml", ".yml"}
+_INVALID_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+MAX_FILE_CHARS = 200_000
+
+
+def create_text_file(filename: str, content: str, folder: str = "Documents", open_in_notepad: bool = True) -> str:
+    """Saves `content` as a new text file (in Documents unless told otherwise) and opens it in
+    Notepad. Never overwrites: a name that is taken gets a "(1)" suffix. Plain text formats only,
+    inside the user's profile."""
+    if not content or not content.strip():
+        return "There is no text to save."
+    if len(content) > MAX_FILE_CHARS:
+        return f"That is too long to save in one go ({len(content)} characters)."
+
+    name = _INVALID_FILENAME_CHARS.sub("", Path((filename or "").strip()).name).strip(" .") or "note.txt"
+    if not Path(name).suffix:
+        name += ".txt"
+    if Path(name).suffix.lower() not in _TEXT_EXTENSIONS:
+        return "I only create plain text files (.txt, .md, .csv, .json, .html...), not programs or scripts."
+
+    try:
+        directory = resolve_folder(folder or "Documents")
+    except ValueError as exc:
+        return str(exc)
+    home = Path.home().resolve()
+    if directory != home and home not in directory.parents:
+        return "I only save files inside your user folder, like Documents or Desktop."
+
+    dest = _free_name(directory, name)
+    try:
+        # A byte-order mark makes older Notepad versions read non-English text correctly.
+        is_txt = dest.suffix.lower() == ".txt"
+        with open(dest, "w", encoding="utf-8-sig" if is_txt else "utf-8", newline="\r\n" if is_txt else "\n") as f:
+            f.write(content)
+    except OSError as exc:
+        return f"I couldn't save the file: {exc.strerror or exc}"
+
+    result = f"Saved {dest}"
+    if dest.name != name:
+        result += f" (the name {name} was already taken)"
+    if not open_in_notepad:
+        return result + "."
+
+    from jarvis.tools import windows_control
+
+    try:
+        subprocess.Popen(["notepad.exe", str(dest)])
+    except OSError as exc:
+        return result + f", but I couldn't open Notepad: {exc.strerror or exc}"
+    hwnd = windows_control.wait_for_window(dest.stem, timeout=8)
+    if hwnd is None:
+        return result + ". I started Notepad, but its window has not appeared yet."
+    windows_control.force_foreground(hwnd)
+    return result + " and opened it in Notepad."
 
 
 def open_file(path: str) -> str:

@@ -95,6 +95,7 @@ _ALIASES = {
 _SOURCE_PRIORITY = {"start": 0, "shortcut": 1, "programs": 2, "apppaths": 3, "scan": 4}
 _FUZZY_MIN_RATIO = 0.86
 _LAUNCH_CONFIRM_SECONDS = 8
+_WINDOW_WAIT_SECONDS = 4
 _INDEX_TTL_SECONDS = 300
 _REBUILD_ON_MISS_AFTER = 30
 
@@ -450,6 +451,26 @@ def _appeared(exe: str) -> bool:
     return _running(exe)
 
 
+def _bring_forward(entry: AppEntry, before: set[int]) -> None:
+    """Once an app is started, put its window in front. Windows keeps a window started by a
+    background program behind everything else (it only flashes in the taskbar), which looks
+    exactly like "it didn't open". Best effort: apps that live in the tray have no window."""
+    from jarvis.tools import windows_control as wc
+
+    deadline = time.time() + _WINDOW_WAIT_SECONDS
+    words = [w for w in entry.words if len(w) >= 3] or entry.words
+    while time.time() < deadline:
+        windows = wc.visible_windows()
+        fresh = {h: t for h, t in windows.items() if h not in before}
+        pool = fresh or {h: t for h, t in windows.items() if any(w in _norm(t) for w in words)}
+        named = {h: t for h, t in pool.items() if any(w in _norm(t) for w in words)}
+        target = next(iter(named or fresh), None)
+        if target is not None:
+            wc.force_foreground(target)
+            return
+        time.sleep(0.3)
+
+
 def _launch(entry: AppEntry) -> str:
     exe = entry.exe
     if entry.source == "shortcut":
@@ -462,11 +483,21 @@ def _launch(entry: AppEntry) -> str:
 
     was_running = bool(exe and _running(exe))
     try:
+        from jarvis.tools import windows_control as wc
+
+        before = set(wc.visible_windows())
+    except Exception:  # noqa: BLE001
+        before = set()
+    try:
         os.startfile(entry.launch)  # type: ignore[attr-defined]  (Windows-only)
     except OSError as exc:
         logger.warning("Failed to open %s (%s): %s", entry.name, entry.launch, exc)
         return f"I found '{entry.name}' but couldn't start it: {exc.strerror or exc}"
     if exe is None or was_running or _appeared(exe):
+        try:
+            _bring_forward(entry, before)
+        except Exception:  # noqa: BLE001 - never let window handling turn a successful launch into a failure
+            logger.debug("Could not bring %s to the front", entry.name, exc_info=True)
         return f"Opened {entry.name}."
     return (f"I started {entry.name}, but I couldn't confirm that it opened. "
             "It may still be loading, or it may have failed to start.")

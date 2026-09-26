@@ -97,7 +97,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "get_default_output_device",
-        "description": "Reports which audio device (speakers/headphones/monitor) Windows is currently sending sound to. Use this if the user says they can't hear you / TTS seems silent / audio isn't working -- it's very often because the default output is a Bluetooth headset or a display's speakers that isn't actually in use, not a real problem.",
+        "description": "Which audio device Windows is sending sound to. Use when the user can't hear you or audio seems silent.",
         "input_schema": {"type": "object", "properties": {}},
     },
     {
@@ -112,7 +112,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "search_files",
-        "description": "Search for files by (partial) filename or a wildcard like '*.pdf' under the user's home directory, or a given folder (name or path). To see what is in a folder, use list_folder instead.",
+        "description": "Find files by (partial) name or wildcard like '*.pdf' under the user's folder or a given folder. To see what's in a folder use list_folder.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -142,7 +142,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "open_url",
-        "description": "Opens a URL in the default web browser. Only use this when the user explicitly asks to open a specific site/link (e.g. 'open github.com'). Do NOT use this to answer a question or look something up -- use web_search or wikipedia_lookup instead, which return the answer as text without interrupting the user with a browser window.",
+        "description": "Open a URL in the browser. Only when the user explicitly asks to open a site; never to answer a question.",
         "input_schema": {
             "type": "object",
             "properties": {"url": {"type": "string", "description": "URL to open."}},
@@ -151,7 +151,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "web_search",
-        "description": "Runs a real DuckDuckGo web search entirely in the background and returns the top results (title + snippet) as text for you to summarize in your reply. Use this for current-events, weather, or any factual question you don't already know the answer to -- never open_url for this, even if the results are thin; just relay what you found (or that you found nothing) as a normal spoken answer.",
+        "description": "Search the web in the background and return the top results as text to summarize. Use for current events, weather and facts you don't know. Never use open_url for this.",
         "input_schema": {
             "type": "object",
             "properties": {"query": {"type": "string", "description": "Search query."}},
@@ -160,7 +160,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "wikipedia_lookup",
-        "description": "Fetches a short summary of a Wikipedia article, entirely in the background, and returns it as text for you to relay -- never opens a browser. Best for 'who/what is X' questions about a specific person, place, or thing.",
+        "description": "Short Wikipedia summary of a person, place or thing, returned as text (opens no browser).",
         "input_schema": {
             "type": "object",
             "properties": {"query": {"type": "string", "description": "Topic or article title to look up, e.g. 'Ada Lovelace' or 'Mount Everest'."}},
@@ -181,7 +181,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "set_reminder",
-        "description": "Set a reminder for a specific date and clock time; it is spoken aloud when due, even if Jarvis is restarted in between. Work out the exact time from the current local date and time given in the system prompt.",
+        "description": "Reminder for a specific date and time, spoken when due. Work out the exact time from the current date/time in the system prompt.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -207,7 +207,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "remember",
-        "description": "Save something the user asked you to remember about themselves or their preferences (name, family, favourites, habits). Saved facts are shown to you on every future request. Use a short label so a later value replaces an older one, e.g. key 'user name', value 'Ravi'. Only call this when the user explicitly asks you to remember something.",
+        "description": "Save something the user asked you to remember about themselves (name, family, preferences). Use a short label so a later value replaces an older one. Only when they explicitly ask.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -228,7 +228,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "list_folder",
-        "description": "Summarize a folder: how many files and folders it has, a count by type, and the most recently changed files. Use this to see what is in a folder such as Downloads, Documents or Desktop. Accepts a folder name or a full path.",
+        "description": "Summarize a folder: file/folder counts, counts by type, and the most recent files. Accepts a name (Downloads, Documents, Desktop...) or a path.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -240,7 +240,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "organize_folder",
-        "description": "Tidy a folder by sorting its loose files into sub-folders by type (Documents, Images, Videos, Audio, Installers, Archives, Other). Never deletes or overwrites, only works inside the user's profile, and can be undone. ALWAYS call it first with dry_run true to preview, tell the user what would happen, and only call it with dry_run false after they agree (the real run also asks for confirmation). Use this instead of trying to run scripts.",
+        "description": "Sort a folder's loose files into sub-folders by type (Documents, Images, Videos, Audio, Installers, Archives, Other). Never deletes or overwrites; only inside the user's profile; can be undone. ALWAYS call with dry_run true first, explain, and run with dry_run false only after the user agrees. Use this instead of scripts.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -257,8 +257,33 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "input_schema": {"type": "object", "properties": {}},
     },
     {
+        "name": "create_text_file",
+        "description": "Write a new document for the user: saves the text as a file (in Documents unless told otherwise) and opens it in Notepad. Use this to write a letter, note, list or any text. Never overwrites an existing file.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "filename": {"type": "string", "description": "File name, e.g. 'leave_application.txt'."},
+                "content": {"type": "string", "description": "The full text of the document."},
+                "folder": {"type": "string", "description": "Folder name or path. Default Documents."},
+            },
+            "required": ["filename", "content"],
+        },
+    },
+    {
+        "name": "type_into_window",
+        "description": "Type text into a window that is already open, at its cursor, then verify it arrived. Only for when the user asks to type into an existing window; to write a new document use create_text_file. Refuses command/terminal windows.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title_substring": {"type": "string", "description": "Part of the window's title, e.g. 'Notepad'."},
+                "text": {"type": "string", "description": "The text to type."},
+            },
+            "required": ["title_substring", "text"],
+        },
+    },
+    {
         "name": "get_current_location",
-        "description": "Reports an approximate current location (city/region/country) based on this PC's internet connection (IP-based geolocation). This is a desktop machine with no real GPS hardware, so it's only accurate to roughly city level -- not precise, and can be wrong if a VPN is active. Use for 'where am I' or location-dependent questions (e.g. as a starting point before a web_search for local weather/news), and be upfront that it's an approximation, not GPS.",
+        "description": "Approximate location (city level, from the internet connection, not GPS). Say it is approximate.",
         "input_schema": {"type": "object", "properties": {}},
     },
     {
@@ -305,6 +330,8 @@ TOOL_DISPATCH: dict[str, Callable[..., str]] = {
     "list_folder": lambda path, limit=40: files.list_folder(path, limit),
     "organize_folder": lambda path, keep_originals=False, dry_run=True: files.organize_folder(path, keep_originals, dry_run),
     "undo_organize": lambda: files.undo_organize(),
+    "create_text_file": lambda filename, content, folder="Documents": files.create_text_file(filename, content, folder),
+    "type_into_window": lambda title_substring, text: windows_control.type_into_window(title_substring, text),
     "get_current_location": lambda: location.get_current_location(),
     "set_timer": lambda duration_seconds, label="": reminders.set_timer(duration_seconds, label),
     "set_reminder": lambda when, message: reminders.set_reminder(when, message),
