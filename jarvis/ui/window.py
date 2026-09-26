@@ -87,7 +87,10 @@ class JarvisAPI:
         from jarvis.tools import registry
 
         before = registry.call_count()
-        reply = respond_speaking(self.brain_holder.brain, text, self.speaker, _BRAIN_ERROR_REPLY)
+        reply = respond_speaking(
+            self.brain_holder.brain, text, self.speaker, _BRAIN_ERROR_REPLY,
+            on_text=lambda sentence: push_stream(self.window, sentence),
+        )
         after = registry.call_count()
         tools = registry.get_recent_calls(after - before) if after > before else []
         return {"reply": reply, "tools": tools}
@@ -122,7 +125,10 @@ class JarvisAPI:
             return {"heard": "", "reply": "", "tools": []}
 
         before = registry.call_count()
-        reply = respond_speaking(self.brain_holder.brain, text, self.speaker, _BRAIN_ERROR_REPLY)
+        reply = respond_speaking(
+            self.brain_holder.brain, text, self.speaker, _BRAIN_ERROR_REPLY,
+            on_text=lambda sentence: push_stream(self.window, sentence),
+        )
         after = registry.call_count()
         tools = registry.get_recent_calls(after - before) if after > before else []
         return {"heard": text, "reply": reply, "tools": tools}
@@ -398,6 +404,17 @@ def push_message(window, role: str, text: str, tools: Optional[list[str]] = None
     except Exception:
         logger.debug("push_message failed (window not ready?)", exc_info=True)
         return False
+
+
+def push_stream(window, text: str) -> None:
+    """Shows text in the main window as it is written (a live, unfinished reply
+    that the final message then replaces). Safe to call from any thread."""
+    if window is None:
+        return
+    try:
+        window.evaluate_js(f"streamText({json.dumps(text)})")
+    except Exception:
+        logger.debug("push_stream failed (window not ready?)", exc_info=True)
 
 
 def push_status(window, **fields: Any) -> None:

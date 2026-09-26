@@ -10,7 +10,7 @@ tool-use loop and the schemas are decoupled from any single skill.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from jarvis.tools import apps, files, location, memory_tools, reminders, safety, system, system_monitor, web, windows_control
 
@@ -19,7 +19,7 @@ logger = logging.getLogger("jarvis.tools.registry")
 TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "name": "open_app",
-        "description": "Open/launch an application by name, e.g. 'notepad', 'chrome', 'spotify', or a full path.",
+        "description": "Open/launch an application by name, e.g. 'notepad', 'chrome', 'spotify', or open a file or folder by full path. It only opens things: it cannot run commands, scripts or PowerShell, or pass options to a program.",
         "input_schema": {
             "type": "object",
             "properties": {"name": {"type": "string", "description": "Application name or path to launch."}},
@@ -112,7 +112,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     },
     {
         "name": "search_files",
-        "description": "Search for files by (partial) filename under the user's home directory, or a given root path.",
+        "description": "Search for files by (partial) filename or a wildcard like '*.pdf' under the user's home directory, or a given folder (name or path). To see what is in a folder, use list_folder instead.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -227,6 +227,36 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "list_folder",
+        "description": "Summarize a folder: how many files and folders it has, a count by type, and the most recently changed files. Use this to see what is in a folder such as Downloads, Documents or Desktop. Accepts a folder name or a full path.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Folder name (Downloads, Documents, Desktop, Pictures, Videos, Music) or a full path."},
+                "limit": {"type": "number", "description": "How many recent files to list (default 40)."},
+            },
+            "required": ["path"],
+        },
+    },
+    {
+        "name": "organize_folder",
+        "description": "Tidy a folder by sorting its loose files into sub-folders by type (Documents, Images, Videos, Audio, Installers, Archives, Other). Never deletes or overwrites, only works inside the user's profile, and can be undone. ALWAYS call it first with dry_run true to preview, tell the user what would happen, and only call it with dry_run false after they agree (the real run also asks for confirmation). Use this instead of trying to run scripts.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Folder name (e.g. Downloads) or full path."},
+                "keep_originals": {"type": "boolean", "description": "true = copy files and leave the originals where they are; false (default) = move them."},
+                "dry_run": {"type": "boolean", "description": "true (default) = only preview; false = actually do it."},
+            },
+            "required": ["path"],
+        },
+    },
+    {
+        "name": "undo_organize",
+        "description": "Undo the most recent organize_folder: put moved files back where they were (or remove the copies).",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "get_current_location",
         "description": "Reports an approximate current location (city/region/country) based on this PC's internet connection (IP-based geolocation). This is a desktop machine with no real GPS hardware, so it's only accurate to roughly city level -- not precise, and can be wrong if a VPN is active. Use for 'where am I' or location-dependent questions (e.g. as a starting point before a web_search for local weather/news), and be upfront that it's an approximation, not GPS.",
         "input_schema": {"type": "object", "properties": {}},
@@ -272,6 +302,9 @@ TOOL_DISPATCH: dict[str, Callable[..., str]] = {
     "open_url": lambda url: web.open_url(url),
     "web_search": lambda query: web.web_search(query),
     "wikipedia_lookup": lambda query: web.wikipedia_lookup(query),
+    "list_folder": lambda path, limit=40: files.list_folder(path, limit),
+    "organize_folder": lambda path, keep_originals=False, dry_run=True: files.organize_folder(path, keep_originals, dry_run),
+    "undo_organize": lambda: files.undo_organize(),
     "get_current_location": lambda: location.get_current_location(),
     "set_timer": lambda duration_seconds, label="": reminders.set_timer(duration_seconds, label),
     "set_reminder": lambda when, message: reminders.set_reminder(when, message),
@@ -283,6 +316,16 @@ TOOL_DISPATCH: dict[str, Callable[..., str]] = {
     "set_brightness": lambda percent: system.set_brightness(percent),
     "get_brightness": lambda: system.get_brightness(),
 }
+
+
+_tool_listener: Optional[Callable[[str], None]] = None
+
+
+def set_tool_listener(listener: Optional[Callable[[str], None]]) -> None:
+    """Called with a tool's name just before it runs, so the UI can show what
+    Jarvis is doing while a long request is in progress."""
+    global _tool_listener
+    _tool_listener = listener
 
 
 _recent_calls: list[str] = []
@@ -323,6 +366,11 @@ def run_tool(name: str, tool_input: dict[str, Any]) -> str:
         _total_calls += 1  # counted so the UI still shows what was attempted
         _recent_calls.append(_format_call(name, tool_input) + " (awaiting confirmation)")
         return needs_confirmation
+    if _tool_listener is not None:
+        try:
+            _tool_listener(name)
+        except Exception:  # noqa: BLE001 - a broken status display must never stop a tool
+            logger.debug("Tool listener failed", exc_info=True)
     try:
         result = fn(**tool_input)
         return str(result)

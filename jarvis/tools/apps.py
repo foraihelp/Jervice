@@ -6,26 +6,54 @@ resolves app names, .exe names, and file paths via the same App Paths /
 PATH resolution Windows itself uses, so it works for almost anything
 installed normally (notepad, calc, chrome, spotify, a project folder, etc.)
 without needing a hardcoded path table.
+
+It opens things; it does not run commands. An earlier version fell back to
+`cmd /c start`, which reported success the moment cmd itself started, even for
+a bogus name or a whole PowerShell script the AI model passed in as the "app
+name" -- so a task could silently do nothing while being reported as done.
 """
 
 from __future__ import annotations
 
 import logging
 import os
-import subprocess
-import time
+import re
+import shutil
+from pathlib import Path
 
 import psutil
 
 logger = logging.getLogger("jarvis.tools.apps")
 
+# Letters, digits, spaces, and a few characters real app names use. Anything with
+# quotes, pipes, redirects, semicolons, $ and so on is a command, not a name.
+_APP_NAME = re.compile(r"^[\w .+()'-]{1,80}$")
+_SETTINGS_URI = re.compile(r"^ms-[a-z]+:[\w/?=.-]*$", re.IGNORECASE)
+_REFUSAL = (
+    "I can only open an app by its name (like 'notepad') or a file or folder path. "
+    "I can't run commands or scripts, or pass options to a program."
+)
+
 
 def open_app(name: str) -> str:
-    """Attempts to launch an application by name (e.g. "notepad", "chrome",
-    "spotify") or by full path. Returns a human-readable result string."""
-    name = name.strip()
+    """Opens an application by name (e.g. "notepad", "chrome", "spotify"), or a file
+    or folder by path. Returns what actually happened, including failure."""
+    name = name.strip().strip('"')
     if not name:
         return "No application name given."
+
+    is_path = False
+    try:
+        is_path = Path(name).expanduser().exists()
+    except OSError:
+        pass
+
+    if not is_path:
+        if not (_APP_NAME.match(name) or _SETTINGS_URI.match(name)):
+            return _REFUSAL
+        # "chrome --incognito", "cmd /c ..." : options make it a command, not a name.
+        if any(token.startswith(("-", "/")) for token in name.split()[1:]):
+            return _REFUSAL
 
     try:
         os.startfile(name)  # type: ignore[attr-defined]  (Windows-only)
@@ -33,18 +61,16 @@ def open_app(name: str) -> str:
     except OSError:
         pass
 
-    # Fall back to letting the shell resolve it (handles things like
-    # "notepad.exe" vs "notepad", or apps registered only on PATH).
-    try:
-        subprocess.Popen(
-            ["cmd", "/c", "start", "", name],
-            shell=False,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-        return f"Opened {name}."
-    except Exception as exc:
-        logger.warning("Failed to open app %r: %s", name, exc)
-        return f"I couldn't find or launch '{name}'."
+    # Some apps are on PATH but not registered with the shell under the bare name.
+    found = shutil.which(name) or shutil.which(name + ".exe")
+    if found:
+        try:
+            os.startfile(found)  # type: ignore[attr-defined]
+            return f"Opened {name}."
+        except OSError as exc:
+            logger.warning("Failed to open %r (%s): %s", name, found, exc)
+
+    return f"I couldn't find an app or file called '{name}'."
 
 
 def close_app(name: str) -> str:

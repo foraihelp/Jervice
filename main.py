@@ -21,6 +21,7 @@ from jarvis.audio.stt import Transcriber
 from jarvis.audio.tts import Speaker
 from jarvis.audio.wake_word import WakeWordListener
 from jarvis.brain import BrainHolder, create_brain
+from jarvis.brain import progress
 from jarvis.brain.memory import Memory
 from jarvis.brain.streaming import respond_speaking
 from jarvis.config import load_config
@@ -33,6 +34,7 @@ from jarvis.ui.window import (
     open_settings_window,
     push_message,
     push_status,
+    push_stream,
     push_update_status,
 )
 
@@ -225,7 +227,10 @@ def main() -> None:
 
     def respond_turn(text):
         before = registry.call_count()
-        reply = respond_speaking(brain_holder.brain, text, speaker, "Sorry, I hit an error handling that.")
+        reply = respond_speaking(
+            brain_holder.brain, text, speaker, "Sorry, I hit an error handling that.",
+            on_text=lambda sentence: push_stream(window, sentence),
+        )
         after = registry.call_count()
         return reply, (registry.get_recent_calls(after - before) if after > before else [])
 
@@ -253,6 +258,12 @@ def main() -> None:
     # Loaded from the user's data folder, so timers and remembered facts survive
     # closing Jarvis. Started here (not earlier) because announcing one needs
     # the speaker, window and tray to exist.
+    # What Jarvis is doing right now, on the window's status line: which tool is
+    # running, or that it is waiting out the AI provider's rate limit.
+    registry.set_tool_listener(
+        lambda name: push_status(window, statusLine="USING " + name.replace("_", " ").upper() + "...")
+    )
+    progress.set_listener(lambda message: push_status(window, statusLine=message))
     safety.configure(config.confirm_risky)
     memory_tools.configure(lambda: brain_holder.brain.memory)
     reminders.configure(config.memory_file.parent / "reminders.json", announce_reminder)

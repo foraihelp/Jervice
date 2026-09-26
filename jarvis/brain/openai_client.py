@@ -10,12 +10,17 @@ from __future__ import annotations
 
 import json
 import logging
+import math
+import re
 import threading
+import time
 from typing import Callable, Optional
 
+import openai
 from openai import OpenAI
 
 from jarvis.brain.context import dynamic_context
+from jarvis.brain import progress
 from jarvis.brain.memory import Memory
 from jarvis.brain.streaming import SentenceStreamer
 from jarvis.tools.registry import TOOL_SCHEMAS, run_tool
@@ -25,6 +30,23 @@ logger = logging.getLogger("jarvis.brain")
 
 MAX_TOOL_ITERATIONS = 6  # safety cap against runaway tool-use loops
 _STREAMING_REFUSED_STATUSES = {400, 404, 405, 415, 422, 501}
+_MAX_ATTEMPTS = 3          # per model call, when the provider says "slow down"
+_MAX_WAIT_SECONDS = 30     # longer than this and it is better to tell the user than to sit silent
+
+
+def _retry_after_seconds(exc: "openai.RateLimitError", attempt: int) -> float:
+    """How long the provider asks us to wait: its Retry-After header, else the
+    "try again in 4.5s" / "1m2.5s" in its message, else a modest guess."""
+    try:
+        header = exc.response.headers.get("retry-after")
+        if header:
+            return float(header)
+    except Exception:  # noqa: BLE001
+        pass
+    match = re.search(r"try again in (?:(\d+)m)?\s*([\d.]+)s", str(exc))
+    if match:
+        return int(match.group(1) or 0) * 60 + float(match.group(2))
+    return 5.0 * attempt
 
 
 def _openai_tools() -> list[dict]:
@@ -55,7 +77,9 @@ class OpenAIBrain:
         memory: Memory,
         base_url: str = "",
     ):
-        self._client = OpenAI(api_key=api_key, base_url=base_url or None)
+        # No hidden SDK retries: they slept for a minute or more in silence, which looked like a
+        # frozen app. _request() below retries a bounded number of times and shows why.
+        self._client = OpenAI(api_key=api_key, base_url=base_url or None, max_retries=0)
         self.model = model
         self.max_tokens = max_tokens
         self.system_prompt = system_prompt
@@ -76,6 +100,27 @@ class OpenAIBrain:
         end_turn(reply)
         return reply
 
+    def _request(self, **kwargs):
+        """chat.completions.create with bounded retries for rate limits (waiting as
+        long as the provider asks, and saying so in the window) and for brief
+        network/server hiccups."""
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                return self._client.chat.completions.create(**kwargs)
+            except openai.RateLimitError as exc:
+                wait = _retry_after_seconds(exc, attempt)
+                if getattr(exc, "code", None) == "insufficient_quota" or attempt >= _MAX_ATTEMPTS or wait > _MAX_WAIT_SECONDS:
+                    raise
+                progress.notify(f"AI PROVIDER RATE LIMIT · RETRYING IN {math.ceil(wait)}s")
+                time.sleep(wait + 0.5)
+            except (openai.APIConnectionError, openai.InternalServerError):
+                if attempt >= 2:
+                    raise
+                progress.notify("AI PROVIDER UNREACHABLE · RETRYING")
+                time.sleep(1.5)
+
     def _complete(self, messages: list[dict], streamer: Optional[SentenceStreamer]) -> tuple[str, list[dict]]:
         """One model call. Returns (text, tool_calls) where each tool call is
         {"id", "name", "arguments"}. Streams text through `streamer` when
@@ -87,7 +132,7 @@ class OpenAIBrain:
             text_parts: list[str] = []
             calls: dict[int, dict] = {}
             try:
-                for chunk in self._client.chat.completions.create(stream=True, **kwargs):
+                for chunk in self._request(stream=True, **kwargs):
                     if not chunk.choices:
                         continue
                     delta = chunk.choices[0].delta
@@ -118,7 +163,7 @@ class OpenAIBrain:
                 ]
                 return "".join(text_parts).strip(), tool_calls
 
-        message = self._client.chat.completions.create(**kwargs).choices[0].message
+        message = self._request(**kwargs).choices[0].message
         tool_calls = [
             {"id": tc.id, "name": tc.function.name, "arguments": tc.function.arguments}
             for tc in message.tool_calls or []

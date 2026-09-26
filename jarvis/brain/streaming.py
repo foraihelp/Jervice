@@ -66,19 +66,67 @@ def _friendly_error(exc: Exception, default: str) -> str:
     return default
 
 
+_BOX_DRAWING = set("\u2500\u2502\u251c\u2514\u250c\u2510\u2518\u2524\u252c\u2534\u253c")
+
+
+def _is_table_or_diagram(sentence: str) -> bool:
+    s = sentence.strip()
+    if s.startswith("|") or s.count("|") >= 2 or any(c in _BOX_DRAWING for c in s):
+        return True
+    letters = sum(c.isalnum() for c in s)
+    return len(s) > 6 and letters / len(s) < 0.4
+
+
+class SpokenText:
+    """Decides which of a reply's sentences are worth reading aloud. Code blocks,
+    tables and folder-tree diagrams are for reading, not listening, and a long
+    reply is spoken only in part, with a pointer to the rest on screen. The window
+    always shows the full text."""
+
+    def __init__(self, max_chars: int = 420):
+        self._left = max_chars
+        self._in_code = False
+        self._announced = False
+
+    def filter(self, sentence: str) -> Optional[str]:
+        """The part of `sentence` to speak, or None. Judged line by line, because
+        the sentence splitter can join a table row and the sentence after it."""
+        kept = [line for line in (self._line(l) for l in sentence.split("\n")) if line]
+        return " ".join(kept) or None
+
+    def _line(self, line: str) -> Optional[str]:
+        fences = line.count("```")
+        if self._in_code or fences:
+            if fences % 2:
+                self._in_code = not self._in_code
+            return None
+        if not line.strip() or _is_table_or_diagram(line):
+            return None
+        if self._left <= 0:
+            if self._announced:
+                return None
+            self._announced = True
+            return "The rest is on screen."
+        self._left -= len(line)
+        return line.strip()
+
+
 class SpeechCancelled(Exception):
     """Raised inside a brain's streaming loop once the user has pressed Stop,
     to abandon the rest of the reply (and close the connection to the model)
     instead of generating text nobody will hear."""
 
 
-def respond_speaking(brain, text: str, speaker, error_reply: str) -> str:
+def respond_speaking(brain, text: str, speaker, error_reply: str, on_text: Optional[Callable[[str], None]] = None) -> str:
     """Runs one brain turn, speaking the reply sentence by sentence as it is
     generated (or all at once for a brain that can't stream). Never raises: a
     brain failure is logged and `error_reply` is spoken and returned instead,
     so a bad API key or a network drop can't leave the user with silence.
     If the user presses Stop (Speaker.stop()) mid-reply, generation is
     abandoned and only the part that was already spoken is returned.
+    `on_text`, if given, receives every sentence as it is produced (even ones that
+    are not spoken), so the window can show the reply as it is written rather than
+    only when the whole request has finished.
     Returns the reply text for display."""
     if speaker is None:
         try:
@@ -89,12 +137,20 @@ def respond_speaking(brain, text: str, speaker, error_reply: str) -> str:
 
     generation = speaker.generation
     delivered: list[str] = []
+    spoken = SpokenText()
 
     def on_sentence(sentence: str) -> None:
         if speaker.generation != generation:
             raise SpeechCancelled
         delivered.append(sentence)
-        speaker.say(sentence, generation=generation)
+        if on_text is not None:
+            try:
+                on_text(sentence)
+            except Exception:  # noqa: BLE001 - a display hiccup must not stop the reply
+                logger.debug("on_text failed", exc_info=True)
+        line = spoken.filter(sentence)
+        if line:
+            speaker.say(line, generation=generation)
 
     try:
         return brain.respond(text, on_sentence=on_sentence)

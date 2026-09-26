@@ -14,11 +14,12 @@ user speaks or types again.
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 from typing import Any, Optional
 
-RISKY_TOOLS = {"close_app", "close_window", "lock_workstation"}
+RISKY_TOOLS = {"close_app", "close_window", "lock_workstation", "organize_folder"}
 
 _PENDING_TTL_SECONDS = 120
 
@@ -71,6 +72,8 @@ def _asked_about(name: str, tool_input: dict[str, Any]) -> bool:
     if name == "lock_workstation":
         return "lock" in reply
     target = str(tool_input.get("name") or tool_input.get("title_substring") or "").strip().lower()
+    if not target and tool_input.get("path"):
+        target = os.path.basename(str(tool_input["path"]).rstrip("\\/")).lower()
     return bool(target) and target in reply
 
 
@@ -87,7 +90,16 @@ def _key(name: str, tool_input: dict[str, Any]) -> str:
     return name + json.dumps(normalized, sort_keys=True, default=str)
 
 
+def _is_risky(name: str, tool_input: dict[str, Any]) -> bool:
+    if name == "organize_folder":
+        return not tool_input.get("dry_run", True)  # a preview changes nothing
+    return name in RISKY_TOOLS
+
+
 def _describe(name: str, tool_input: dict[str, Any]) -> str:
+    if name == "organize_folder":
+        verb = "copy" if tool_input.get("keep_originals") else "move"
+        return f"{verb} the loose files in {tool_input.get('path', 'that folder')} into type sub-folders"
     if name == "close_app":
         return f"close {tool_input.get('name', 'that app')}"
     if name == "close_window":
@@ -100,7 +112,7 @@ def _describe(name: str, tool_input: dict[str, Any]) -> str:
 def check(name: str, tool_input: dict[str, Any]) -> Optional[str]:
     """Returns None if the call may proceed now, otherwise the message to give
     the model instead of running the tool."""
-    if not _enabled or name not in RISKY_TOOLS:
+    if not _enabled or not _is_risky(name, tool_input):
         return None
 
     now = time.time()
