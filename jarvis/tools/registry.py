@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Optional
 
-from jarvis.tools import apps, files, images, location, memory_tools, reminders, safety, system, system_monitor, web, windows_control
+from jarvis.tools import apps, files, images, location, memory_tools, reminders, safety, system, system_monitor, vision, web, windows_control
 
 logger = logging.getLogger("jarvis.tools.registry")
 
@@ -165,6 +165,16 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             "type": "object",
             "properties": {"query": {"type": "string", "description": "Topic or article title to look up, e.g. 'Ada Lovelace' or 'Mount Everest'."}},
             "required": ["query"],
+        },
+    },
+    {
+        "name": "see_screen",
+        "description": "Takes a screenshot of the user's screen right now and answers a question about it -- explain an error message or dialog, read text that's hard to make out, or describe what app or window is open. Only sees the current screen (not files, photos, or anything not visible right now). Not every AI model can look at images -- if it can't, say so honestly rather than guessing what might be on screen.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "question": {"type": "string", "description": "What to look at or answer about the screen. Leave blank for a general description."},
+            },
         },
     },
     {
@@ -340,6 +350,7 @@ TOOL_DISPATCH: dict[str, Callable[..., str]] = {
     "web_search": lambda query: web.web_search(query),
     "wikipedia_lookup": lambda query: web.wikipedia_lookup(query),
     "create_image": lambda prompt, filename="": images.create_image(prompt, filename),
+    "see_screen": lambda question="": vision.describe_screen(question),
     "list_folder": lambda path, limit=40: files.list_folder(path, limit),
     "organize_folder": lambda path, keep_originals=False, dry_run=True: files.organize_folder(path, keep_originals, dry_run),
     "undo_organize": lambda: files.undo_organize(),
