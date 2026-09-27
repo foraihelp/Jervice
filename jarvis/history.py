@@ -47,8 +47,10 @@ def add(role: str, text: str, tools: Optional[list[str]] = None) -> None:
 
 
 def _trim() -> None:
+    from jarvis.fsutil import atomic_write_text
+
     lines = _path.read_text(encoding="utf-8").splitlines()[-KEEP_LINES_WHEN_TRIMMED:]
-    _path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    atomic_write_text(_path, "\n".join(lines) + "\n")
 
 
 def recent(n: int = RESTORE_MESSAGES) -> list[dict[str, Any]]:

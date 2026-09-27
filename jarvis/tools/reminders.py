@@ -55,8 +55,9 @@ class Scheduler:
             return []
 
     def _save_locked(self) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(json.dumps(self._items, indent=2, ensure_ascii=False), encoding="utf-8")
+        from jarvis.fsutil import atomic_write_text
+
+        atomic_write_text(self._path, json.dumps(self._items, indent=2, ensure_ascii=False))
 
     def start(self) -> None:
         threading.Thread(target=self._run, daemon=True, name="reminders").start()

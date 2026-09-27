@@ -68,11 +68,12 @@ class Memory:
     def save(self) -> None:
         if self.path is None:
             return
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        from jarvis.fsutil import atomic_write_text
+
         # Keep only the most recent N turns on disk to bound file size.
         trimmed = self.messages[-(self.history_turns * 2):]
         data = {"provider": self.provider, "messages": trimmed, "facts": self.facts}
-        self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        atomic_write_text(self.path, json.dumps(data, indent=2))
 
     def save_facts(self) -> None:
         """Writes only the facts to disk, leaving the saved conversation as it
@@ -86,8 +87,9 @@ class Memory:
         except (FileNotFoundError, json.JSONDecodeError, OSError):
             data = {"provider": self.provider, "messages": []}
         data["facts"] = self.facts
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        from jarvis.fsutil import atomic_write_text
+
+        atomic_write_text(self.path, json.dumps(data, indent=2, ensure_ascii=False))
 
     def facts_prompt(self) -> str:
         if not self.facts:

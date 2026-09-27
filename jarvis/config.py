@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import yaml
 from dotenv import load_dotenv
+
+logger = logging.getLogger("jarvis.config")
 
 if getattr(sys, "frozen", False):
     # Running as a PyInstaller-built .exe. The exe's own folder (INSTALL_DIR)
@@ -314,6 +318,69 @@ def _env_path() -> Path:
     return PROJECT_ROOT / ".env"
 
 
+# The top-level sections and leaf keys every Config property reads unconditionally (via
+# self.raw["section"]["key"]) -- used to tell a structurally sound config.yaml from one a
+# truncated or otherwise mid-write file left syntactically valid YAML but the wrong shape
+# (e.g. a section that ended up as a string instead of a mapping).
+_REQUIRED_CONFIG_KEYS: dict[str, list[str]] = {
+    "wake_word": ["model", "threshold"],
+    "recording": ["silence_seconds", "max_seconds", "sample_rate"],
+    "stt": ["model_size", "device", "compute_type"],
+    "tts": ["rate", "volume"],
+    "brain": ["model", "max_tokens", "system_prompt"],
+    "memory": ["history_turns"],
+    "logging": ["level", "file"],
+}
+
+
+def _is_valid_config(raw: Any) -> bool:
+    if not isinstance(raw, dict):
+        return False
+    for section, keys in _REQUIRED_CONFIG_KEYS.items():
+        value = raw.get(section)
+        if not isinstance(value, dict) or any(key not in value for key in keys):
+            return False
+    return True
+
+
+def _seed_config_from_template(config_path: Path) -> None:
+    bundled_template = INSTALL_DIR / "config.yaml"
+    if bundled_template != config_path and bundled_template.exists():
+        # Frozen build's first run: seed the per-user writable copy from
+        # the read-only template that shipped next to the .exe.
+        import shutil
+
+        shutil.copy(bundled_template, config_path)
+    else:
+        raise FileNotFoundError(
+            f"Missing config.yaml at {config_path}. Copy config.yaml (it "
+            "ships with the project) or restore it from source."
+        )
+
+
+def _read_config_yaml(config_path: Path) -> dict[str, Any]:
+    """Loads config.yaml, recovering instead of crashing the whole app if it was left
+    truncated or otherwise unreadable -- e.g. by a forced process kill or a power loss
+    mid-write while a setting was being saved (writes are atomic since, but this still
+    covers a file damaged before that, or by something outside Jarvis entirely)."""
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            raw = yaml.safe_load(f)
+        if not _is_valid_config(raw):
+            raise ValueError("config.yaml is empty, truncated, or missing settings this app expects")
+        return raw
+    except Exception as exc:  # noqa: BLE001 - YAMLError, ValueError, or a mid-write OSError
+        logger.warning("config.yaml at %s is unreadable (%s); resetting it to defaults.", config_path, exc)
+        broken = config_path.with_suffix(f".broken-{int(time.time())}.yaml")
+        try:
+            config_path.replace(broken)  # kept, in case something in it is worth recovering by hand
+        except OSError:
+            logger.warning("Could not keep a copy of the broken config.yaml", exc_info=True)
+        _seed_config_from_template(config_path)
+        with open(config_path, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f)
+
+
 def load_config() -> Config:
     env_path = _env_path()
     if not env_path.exists():
@@ -328,21 +395,9 @@ def load_config() -> Config:
 
     config_path = PROJECT_ROOT / "config.yaml"
     if not config_path.exists():
-        bundled_template = INSTALL_DIR / "config.yaml"
-        if bundled_template != config_path and bundled_template.exists():
-            # Frozen build's first run: seed the per-user writable copy from
-            # the read-only template that shipped next to the .exe.
-            import shutil
+        _seed_config_from_template(config_path)
 
-            shutil.copy(bundled_template, config_path)
-        else:
-            raise FileNotFoundError(
-                f"Missing config.yaml at {config_path}. Copy config.yaml (it "
-                "ships with the project) or restore it from source."
-            )
-
-    with open(config_path, "r", encoding="utf-8") as f:
-        raw = yaml.safe_load(f)
+    raw = _read_config_yaml(config_path)
 
     api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if api_key == _PLACEHOLDER_API_KEY:
@@ -375,6 +430,16 @@ def load_config() -> Config:
                   fallback_api_keys=fallback_keys)
 
 
+def _dump_yaml_atomic(yaml_rt: Any, data: Any, config_path: Path) -> None:
+    import io
+
+    from jarvis.fsutil import atomic_write_text
+
+    buf = io.StringIO()
+    yaml_rt.dump(data, buf)
+    atomic_write_text(config_path, buf.getvalue())
+
+
 def update_config_value(section: str, key: str, value: Any) -> None:
     """Sets one value in config.yaml, keeping the file's comments and layout."""
     from ruamel.yaml import YAML
@@ -385,8 +450,7 @@ def update_config_value(section: str, key: str, value: Any) -> None:
     with open(config_path, "r", encoding="utf-8") as f:
         data = yaml_rt.load(f)
     data.setdefault(section, {})[key] = value
-    with open(config_path, "w", encoding="utf-8") as f:
-        yaml_rt.dump(data, f)
+    _dump_yaml_atomic(yaml_rt, data, config_path)
 
 
 def save_settings(payload: dict[str, Any]) -> None:
@@ -469,8 +533,7 @@ def save_settings(payload: dict[str, Any]) -> None:
             fallback_keys[len(kept)] = str(entry.get("api_key") or "").strip()
         data.setdefault("brain", {})["fallbacks"] = kept
 
-    with open(config_path, "w", encoding="utf-8") as f:
-        yaml_rt.dump(data, f)
+    _dump_yaml_atomic(yaml_rt, data, config_path)
 
     if "fallbacks" in payload:
         # The list in the payload is the whole truth: slots are rewritten (or cleared) so a
