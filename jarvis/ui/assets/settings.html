@@ -88,6 +88,14 @@
     <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
 
     <div>
+      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:10px;">BACKUP AI (OPTIONAL)</div>
+      <div style="font-size:11px; color:#4A5A6A; margin-bottom:14px;">If the AI above is rate-limited, out of quota or offline, Jarvis answers with a backup instead of failing, and goes back to the main one when it recovers. Tip: Groq limits each model separately, so a smaller Groq model with the same key is a free backup.</div>
+      <div id="backup-slots" style="display:flex; flex-direction:column; gap:16px;"></div>
+    </div>
+
+    <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
+
+    <div>
       <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">YOUR DATA</div>
       <div style="font-size:11px; color:#4A5A6A; margin-bottom:10px;">Jarvis keeps your conversations, remembered facts, reminders and the documents it creates in this folder. Your API key and settings stay in AppData, not here.</div>
       <input id="data-path" type="text" readonly data-tip="The folder Jarvis is using now">
@@ -476,6 +484,7 @@
       $('model').value = s.model || '';
       $('api-key').value = lastKnownKey[s.provider === 'openai' ? 'openai' : 'anthropic'];
       selectProvider(s.provider === 'openai' ? 'openai' : 'anthropic', { keepFields: true });
+      loadBackups(s.fallbacks);
       refreshSttStatus();
     } catch (e) {
       $('save-status').textContent = 'Could not load settings: ' + e;
@@ -504,6 +513,7 @@
         model: $('model').value,
         base_url: $('base-url').value,
         api_key: $('api-key').value,
+        fallbacks: collectBackups(),
       });
       $('save-status').textContent = result && result.applied_live
         ? 'Saved. AI provider, reply language and speech recognition apply now -- try a command. (Voice, microphone, output device, wake word and remote-server changes still need a restart.)'
@@ -578,6 +588,94 @@
     loadStorage();
   });
   $('data-restart').addEventListener('click', () => window.pywebview.api.restart_app());
+
+  // ---- backup AI providers
+  const BACKUP_PRESETS = {
+    '':          { label: 'Not used' },
+    groq:        { label: 'Groq',                    provider: 'openai',    url: 'https://api.groq.com/openai/v1', model: 'llama-3.1-8b-instant', keyHint: 'a Groq key (the same one works)' },
+    openai:      { label: 'OpenAI',                  provider: 'openai',    url: '',                               model: 'gpt-4o-mini',          keyHint: 'an OpenAI key' },
+    anthropic:   { label: 'Claude',                  provider: 'anthropic', url: '',                               model: 'claude-haiku-4-5-20251001', keyHint: 'an Anthropic key' },
+    together:    { label: 'Together',                provider: 'openai',    url: 'https://api.together.xyz/v1',    model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', keyHint: 'a Together key' },
+    openrouter:  { label: 'OpenRouter',              provider: 'openai',    url: 'https://openrouter.ai/api/v1',   model: 'openai/gpt-4o-mini',   keyHint: 'an OpenRouter key' },
+    ollama:      { label: 'Local Ollama (no key, works offline)', provider: 'openai', url: 'http://localhost:11434/v1', model: 'llama3.3', keyHint: '' },
+    custom:      { label: 'Other OpenAI-compatible', provider: 'openai',    url: '',                               model: '',                     keyHint: 'that service\'s key' },
+  };
+
+  function presetFor(entry) {
+    if (!entry || !entry.model) return '';
+    if (entry.provider === 'anthropic') return 'anthropic';
+    const url = (entry.base_url || '').toLowerCase();
+    for (const [id, p] of Object.entries(BACKUP_PRESETS)) {
+      if (p.provider === 'openai' && id !== 'custom' && (p.url || '').toLowerCase() === url) return id;
+    }
+    return 'custom';
+  }
+
+  function buildBackupSlot(index, entry) {
+    const wrap = document.createElement('div');
+    wrap.className = 'backup-slot';
+    wrap.innerHTML = `
+      <div style="font-size:11px; color:#56677A; margin-bottom:6px;">BACKUP ${index + 1}</div>
+      <select class="bk-service">${Object.entries(BACKUP_PRESETS).map(([id, p]) => `<option value="${id}">${p.label}</option>`).join('')}</select>
+      <div class="bk-fields" style="display:none; margin-top:10px;">
+        <div style="font-size:11px; color:#56677A; margin-bottom:6px;">MODEL</div>
+        <input class="bk-model" type="text">
+        <div class="bk-url-row" style="margin-top:10px;">
+          <div style="font-size:11px; color:#56677A; margin-bottom:6px;">BASE URL</div>
+          <input class="bk-url" type="text" placeholder="Leave blank for api.openai.com">
+        </div>
+        <div style="font-size:11px; color:#56677A; margin-bottom:6px; margin-top:10px;">API KEY</div>
+        <input class="bk-key" type="password" placeholder="key">
+        <div class="bk-status" style="font-size:11px; margin-top:8px; color:#56677A;"></div>
+      </div>`;
+    const q = (c) => wrap.querySelector(c);
+    const refresh = () => {
+      const id = q('.bk-service').value;
+      const p = BACKUP_PRESETS[id];
+      q('.bk-fields').style.display = id ? 'block' : 'none';
+      if (!id) return;
+      q('.bk-url-row').style.display = p.provider === 'anthropic' ? 'none' : 'block';
+      const needsKey = id !== 'ollama';
+      q('.bk-key').style.display = needsKey ? 'block' : 'none';
+      q('.bk-key').previousElementSibling.style.display = needsKey ? 'block' : 'none';
+      const missing = needsKey && !q('.bk-key').value;
+      q('.bk-status').textContent = missing ? 'Paste ' + p.keyHint + ' to switch this backup on.' : '';
+      q('.bk-status').style.color = '#FFB454';
+    };
+    q('.bk-service').addEventListener('change', () => {
+      const p = BACKUP_PRESETS[q('.bk-service').value];
+      if (p.provider) { q('.bk-model').value = p.model; q('.bk-url').value = p.url; }
+      refresh();
+    });
+    q('.bk-key').addEventListener('input', refresh);
+
+    const id = presetFor(entry);
+    q('.bk-service').value = id;
+    if (entry && entry.model) {
+      q('.bk-model').value = entry.model; q('.bk-url').value = entry.base_url || ''; q('.bk-key').value = entry.api_key || '';
+    }
+    refresh();
+    wrap.readEntry = () => {
+      const id2 = q('.bk-service').value;
+      if (!id2 || !q('.bk-model').value.trim()) return null;
+      return {
+        provider: BACKUP_PRESETS[id2].provider, model: q('.bk-model').value.trim(),
+        base_url: BACKUP_PRESETS[id2].provider === 'anthropic' ? '' : q('.bk-url').value.trim(),
+        api_key: id2 === 'ollama' ? '' : q('.bk-key').value.trim(),
+      };
+    };
+    return wrap;
+  }
+
+  function loadBackups(list) {
+    const box = $('backup-slots');
+    box.innerHTML = '';
+    for (let i = 0; i < 2; i++) box.appendChild(buildBackupSlot(i, (list || [])[i]));
+  }
+
+  function collectBackups() {
+    return Array.from(document.querySelectorAll('.backup-slot')).map((w) => w.readEntry()).filter(Boolean);
+  }
 
   window.addEventListener('pywebviewready', loadStorage);
   window.addEventListener('pywebviewready', loadSettings);

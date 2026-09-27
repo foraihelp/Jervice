@@ -24,8 +24,11 @@ MAX_TOOL_ITERATIONS = 6  # safety cap against runaway tool-use loops
 
 
 class AnthropicBrain:
-    def __init__(self, api_key: str, model: str, max_tokens: int, system_prompt: str, memory: Memory):
-        self._client = Anthropic(api_key=api_key)
+    def __init__(self, api_key: str, model: str, max_tokens: int, system_prompt: str, memory: Memory,
+                 patient: bool = True):
+        # patient=False: no SDK retries, so a rate limit or outage fails at once and a backup
+        # provider can take over (see brain/fallback.py).
+        self._client = Anthropic(api_key=api_key, max_retries=2 if patient else 0)
         self.model = model
         self.max_tokens = max_tokens
         self.system_prompt = system_prompt

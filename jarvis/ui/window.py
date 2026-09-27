@@ -192,7 +192,7 @@ class SettingsAPI:
     # (and its memory, since Anthropic/OpenAI message formats aren't
     # cross-compatible -- see Memory's provider tag) to take effect
     # immediately instead of needing a full restart.
-    _BRAIN_AFFECTING_KEYS = {"provider", "model", "base_url", "api_key", "reply_language"}
+    _BRAIN_AFFECTING_KEYS = {"provider", "model", "base_url", "api_key", "reply_language", "fallbacks"}
 
     def __init__(self, config, brain_holder, wake_word_listener=None, speaker=None, transcriber=None):
         self.config = config
@@ -226,6 +226,13 @@ class SettingsAPI:
             # switches providers, before saving.
             "anthropic_api_key": self.config.anthropic_api_key,
             "openai_api_key": self.config.openai_api_key,
+            # Backup AI providers, tried in order when the main one is rate-limited or down.
+            # Every saved slot is shown, even one still missing its key, so it can be finished.
+            "fallbacks": [
+                {"provider": e.get("provider") or "openai", "model": e.get("model") or "", "base_url": e.get("base_url") or "",
+                 "api_key": self.config.fallback_api_keys.get(slot, "")}
+                for slot, e in enumerate(list(self.config.raw["brain"].get("fallbacks") or [])[:2], start=1)
+            ],
         }
 
     # ---------------------------------------------------------------- data folder

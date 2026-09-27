@@ -28,12 +28,36 @@ else:
     PROJECT_ROOT = INSTALL_DIR
 
 
+MAX_FALLBACKS = 2
+
+
+@dataclass
+class ProviderSpec:
+    """One AI provider Jarvis can talk to: which service, which model, and the key for it."""
+
+    provider: str          # "anthropic" or "openai" (the latter covers every OpenAI-compatible service)
+    model: str
+    base_url: str
+    api_key: str
+
+    @property
+    def label(self) -> str:
+        return self.model
+
+
+def _is_local_url(url: str) -> bool:
+    lowered = url.lower()
+    return "localhost" in lowered or "127.0.0.1" in lowered or "[::1]" in lowered
+
+
 @dataclass
 class Config:
     raw: dict[str, Any]
     anthropic_api_key: str
     openai_api_key: str
     api_token: str
+    # Keys of the backup AI providers, by slot number (1, 2). See fallback_specs.
+    fallback_api_keys: dict[int, str] = field(default_factory=dict)
 
     @property
     def wake_word_model(self) -> str:
@@ -126,6 +150,29 @@ class Config:
     @property
     def brain_model(self) -> str:
         return self.raw["brain"]["model"]
+
+    @property
+    def primary_spec(self) -> ProviderSpec:
+        return ProviderSpec(self.brain_provider, self.brain_model, self.brain_base_url, self.brain_api_key)
+
+    @property
+    def fallback_specs(self) -> list[ProviderSpec]:
+        """The backup providers, in the order they are tried when the main one is rate-limited
+        or unreachable. A slot without a key is skipped (a local server such as Ollama needs none)."""
+        specs: list[ProviderSpec] = []
+        entries = self.raw["brain"].get("fallbacks") or []
+        for slot, entry in enumerate(list(entries)[:MAX_FALLBACKS], start=1):
+            provider = str(entry.get("provider") or "").strip().lower()
+            model = str(entry.get("model") or "").strip()
+            base_url = str(entry.get("base_url") or "").strip()
+            key = self.fallback_api_keys.get(slot, "")
+            if provider not in ("anthropic", "openai") or not model:
+                continue
+            if not key and provider == "openai" and _is_local_url(base_url):
+                key = "local"   # the client wants some key string; a local server ignores it
+            if key:
+                specs.append(ProviderSpec(provider, model, base_url if provider == "openai" else "", key))
+        return specs
 
     @property
     def brain_max_tokens(self) -> int:
@@ -271,7 +318,9 @@ def load_config() -> Config:
         # will even start. The API key is filled in from the Settings window
         # (see save_settings() below) once the app is running.
         env_path.write_text("", encoding="utf-8")
-    load_dotenv(env_path)
+    # override=True: a key changed in Settings (which writes .env) must win over the value this
+    # process loaded earlier, or a re-read after saving would still see the old key.
+    load_dotenv(env_path, override=True)
 
     config_path = PROJECT_ROOT / "config.yaml"
     if not config_path.exists():
@@ -317,7 +366,9 @@ def load_config() -> Config:
 
         set_key(str(env_path), "JARVIS_API_TOKEN", api_token)
 
-    return Config(raw=raw, anthropic_api_key=api_key, openai_api_key=openai_api_key, api_token=api_token)
+    fallback_keys = {slot: os.environ.get(f"FALLBACK{slot}_API_KEY", "").strip() for slot in range(1, MAX_FALLBACKS + 1)}
+    return Config(raw=raw, anthropic_api_key=api_key, openai_api_key=openai_api_key, api_token=api_token,
+                  fallback_api_keys=fallback_keys)
 
 
 def update_config_value(section: str, key: str, value: Any) -> None:
@@ -398,8 +449,41 @@ def save_settings(payload: dict[str, Any]) -> None:
     if "base_url" in payload:
         data.setdefault("brain", {})["base_url"] = (payload["base_url"] or "").strip()
 
+    fallback_keys: dict[int, str] = {}
+    if "fallbacks" in payload:
+        kept = []
+        for entry in list(payload["fallbacks"] or [])[:MAX_FALLBACKS]:
+            fb_provider = str(entry.get("provider") or "").strip().lower()
+            fb_model = str(entry.get("model") or "").strip()
+            if fb_provider not in ("anthropic", "openai") or not fb_model:
+                continue
+            kept.append({
+                "provider": fb_provider,
+                "model": fb_model,
+                "base_url": str(entry.get("base_url") or "").strip() if fb_provider == "openai" else "",
+            })
+            fallback_keys[len(kept)] = str(entry.get("api_key") or "").strip()
+        data.setdefault("brain", {})["fallbacks"] = kept
+
     with open(config_path, "w", encoding="utf-8") as f:
         yaml_rt.dump(data, f)
+
+    if "fallbacks" in payload:
+        # The list in the payload is the whole truth: slots are rewritten (or cleared) so a
+        # removed backup does not leave its key behind.
+        from dotenv import set_key, unset_key
+
+        env_path = _env_path()
+        if not env_path.exists():
+            env_path.write_text("", encoding="utf-8")
+        for slot in range(1, MAX_FALLBACKS + 1):
+            name = f"FALLBACK{slot}_API_KEY"
+            if fallback_keys.get(slot):
+                set_key(str(env_path), name, fallback_keys[slot])
+            else:
+                if name + "=" in env_path.read_text(encoding="utf-8"):
+                    unset_key(str(env_path), name)
+                os.environ.pop(name, None)
 
     api_token = payload.get("api_token", "").strip() if payload.get("api_token") else ""
     api_key = payload.get("api_key", "").strip() if payload.get("api_key") else ""

@@ -76,7 +76,11 @@ class OpenAIBrain:
         system_prompt: str,
         memory: Memory,
         base_url: str = "",
+        patient: bool = True,
     ):
+        # patient=False: give up at the first rate limit or outage instead of waiting it out,
+        # because a backup provider is standing by (see brain/fallback.py).
+        self.patient = patient
         # No hidden SDK retries: they slept for a minute or more in silence, which looked like a
         # frozen app. _request() below retries a bounded number of times and shows why.
         self._client = OpenAI(api_key=api_key, base_url=base_url or None, max_retries=0)
@@ -111,12 +115,13 @@ class OpenAIBrain:
                 return self._client.chat.completions.create(**kwargs)
             except openai.RateLimitError as exc:
                 wait = _retry_after_seconds(exc, attempt)
-                if getattr(exc, "code", None) == "insufficient_quota" or attempt >= _MAX_ATTEMPTS or wait > _MAX_WAIT_SECONDS:
+                if (getattr(exc, "code", None) == "insufficient_quota" or not self.patient
+                        or attempt >= _MAX_ATTEMPTS or wait > _MAX_WAIT_SECONDS):
                     raise
                 progress.notify(f"AI PROVIDER RATE LIMIT · RETRYING IN {math.ceil(wait)}s")
                 time.sleep(wait + 0.5)
             except (openai.APIConnectionError, openai.InternalServerError):
-                if attempt >= 2:
+                if attempt >= 2 or not self.patient:
                     raise
                 progress.notify("AI PROVIDER UNREACHABLE · RETRYING")
                 time.sleep(1.5)

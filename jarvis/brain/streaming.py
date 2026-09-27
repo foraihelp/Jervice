@@ -63,7 +63,7 @@ def _friendly_error(exc: Exception, default: str) -> str:
         message = str(exc).lower()
         if "per day" in message or "(tpd)" in message or "daily" in message:
             return ("The AI provider's daily allowance for your account is used up. It resets within a day, "
-                    "or you can switch to another provider or a paid plan in Settings.")
+                    "or you can add a backup AI, switch provider, or use a paid plan in Settings.")
         return "The AI provider is limiting how fast I can ask it questions right now. Give it a minute and try again."
     if status in (401, 403):
         return "The AI provider didn't accept my API key. Please check it in Settings."

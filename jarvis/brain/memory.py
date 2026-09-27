@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 logger = logging.getLogger("jarvis.memory")
 
@@ -22,7 +22,8 @@ _OLD_TOOL_OUTPUT_CHARS = 300
 
 
 class Memory:
-    def __init__(self, path: Path, history_turns: int, provider: str = ""):
+    def __init__(self, path: Optional[Path], history_turns: int, provider: str = ""):
+        # path=None gives a memory that lives only in RAM (see in_memory()).
         self.path = path
         self.history_turns = history_turns
         # Different providers use incompatible message shapes (Anthropic's
@@ -35,8 +36,19 @@ class Memory:
         self.facts: dict[str, str] = {}
         self._load()
 
+    @classmethod
+    def in_memory(cls, history_turns: int, provider: str, messages: list[dict[str, Any]], facts: dict[str, str]) -> "Memory":
+        """A conversation that is never written to disk. A backup AI provider works from one of
+        these, seeded with the plain text of the conversation so far, so it can never overwrite the
+        main provider's saved history (whose message format is different). `facts` is shared, not
+        copied, so what Jarvis was asked to remember is the same everywhere."""
+        memory = cls(None, history_turns, provider)
+        memory.messages = list(messages)
+        memory.facts = facts
+        return memory
+
     def _load(self) -> None:
-        if not self.path.exists():
+        if self.path is None or not self.path.exists():
             return
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
@@ -54,6 +66,8 @@ class Memory:
             logger.warning("Could not load memory file %s: %s", self.path, exc)
 
     def save(self) -> None:
+        if self.path is None:
+            return
         self.path.parent.mkdir(parents=True, exist_ok=True)
         # Keep only the most recent N turns on disk to bound file size.
         trimmed = self.messages[-(self.history_turns * 2):]
@@ -65,6 +79,8 @@ class Memory:
         was. Used by the remember/forget tools, which run in the middle of a
         turn -- saving the whole conversation at that point could store a tool
         call whose result hasn't been recorded yet."""
+        if self.path is None:
+            return
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
         except (FileNotFoundError, json.JSONDecodeError, OSError):

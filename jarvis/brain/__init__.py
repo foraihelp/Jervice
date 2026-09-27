@@ -28,28 +28,49 @@ class BrainHolder:
         self.brain = brain
 
 
-def create_brain(config: Any, memory: Memory):
-    """Returns an AnthropicBrain or OpenAIBrain instance, matching
-    config.brain_provider ("anthropic" or "openai" -- the latter also
-    covers any OpenAI-compatible endpoint via config.brain_base_url)."""
-    if config.brain_provider == "openai":
+def _build_brain(spec, config: Any, memory: Memory, patient: bool):
+    """One brain for one provider."""
+    if spec.provider == "openai":
         from jarvis.brain.openai_client import OpenAIBrain
 
         return OpenAIBrain(
-            api_key=config.brain_api_key,
-            model=config.brain_model,
+            api_key=spec.api_key,
+            model=spec.model,
             max_tokens=config.brain_max_tokens,
             system_prompt=config.effective_system_prompt,
             memory=memory,
-            base_url=config.brain_base_url,
+            base_url=spec.base_url,
+            patient=patient,
         )
 
     from jarvis.brain.claude_client import AnthropicBrain
 
     return AnthropicBrain(
-        api_key=config.brain_api_key,
-        model=config.brain_model,
+        api_key=spec.api_key,
+        model=spec.model,
         max_tokens=config.brain_max_tokens,
         system_prompt=config.effective_system_prompt,
         memory=memory,
+        patient=patient,
     )
+
+
+def create_brain(config: Any, memory: Memory):
+    """Returns the brain for config.brain_provider ("anthropic" or "openai" -- the latter also
+    covers any OpenAI-compatible endpoint via config.brain_base_url). When backup providers are
+    set up in Settings, returns a FallbackBrain that tries them in turn if the main one is
+    rate-limited or unreachable; without backups it is just the one brain, unchanged."""
+    backups = config.fallback_specs
+    primary = _build_brain(config.primary_spec, config, memory, patient=not backups)
+    if not backups:
+        return primary
+
+    from jarvis.brain.fallback import FallbackBrain
+
+    members = []
+    for index, spec in enumerate(backups):
+        is_last = index == len(backups) - 1
+        # Only the last provider in the chain waits out a rate limit; the others give up at once.
+        blank = Memory.in_memory(config.history_turns, spec.provider, [], {})
+        members.append((_build_brain(spec, config, blank, patient=is_last), spec.label, spec.provider))
+    return FallbackBrain(primary, members, config.history_turns)
