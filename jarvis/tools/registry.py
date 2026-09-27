@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Optional
 
-from jarvis.tools import apps, files, location, memory_tools, reminders, safety, system, system_monitor, web, windows_control
+from jarvis.tools import apps, files, images, location, memory_tools, reminders, safety, system, system_monitor, web, windows_control
 
 logger = logging.getLogger("jarvis.tools.registry")
 
@@ -165,6 +165,18 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
             "type": "object",
             "properties": {"query": {"type": "string", "description": "Topic or article title to look up, e.g. 'Ada Lovelace' or 'Mount Everest'."}},
             "required": ["query"],
+        },
+    },
+    {
+        "name": "create_image",
+        "description": "Generates a picture from a text description (free, no API key needed) and opens it. For a new picture from a description only -- not for editing an existing photo, and not for charts, diagrams or documents.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string", "description": "What the picture should show, in as much descriptive detail as helpful (subject, style, setting, lighting)."},
+                "filename": {"type": "string", "description": "Optional file name to save it as. Left blank, one is made from the description."},
+            },
+            "required": ["prompt"],
         },
     },
     {
@@ -327,6 +339,7 @@ TOOL_DISPATCH: dict[str, Callable[..., str]] = {
     "open_url": lambda url: web.open_url(url),
     "web_search": lambda query: web.web_search(query),
     "wikipedia_lookup": lambda query: web.wikipedia_lookup(query),
+    "create_image": lambda prompt, filename="": images.create_image(prompt, filename),
     "list_folder": lambda path, limit=40: files.list_folder(path, limit),
     "organize_folder": lambda path, keep_originals=False, dry_run=True: files.organize_folder(path, keep_originals, dry_run),
     "undo_organize": lambda: files.undo_organize(),

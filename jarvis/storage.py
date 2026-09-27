@@ -6,6 +6,7 @@
         reminders.json                timers and reminders
         Documents\\                    letters, notes and Word files Jarvis creates
         Screenshots\\
+        Images\\                       pictures Jarvis generates
         last_organize.json            so a folder tidy-up can be undone
 
 The folder defaults to Documents\\Jarvis. Settings can point it somewhere else or rename it. A change is
@@ -80,6 +81,12 @@ def documents_dir() -> Path:
 
 def screenshots_dir() -> Path:
     path = data_dir() / "Screenshots"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def images_dir() -> Path:
+    path = data_dir() / "Images"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
