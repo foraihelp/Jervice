@@ -4,6 +4,9 @@
         conversations\\history.jsonl   what was said in the window (shown again on the next launch)
         memory.json                   facts Jarvis was asked to remember, and its recent context
         reminders.json                timers and reminders
+        agents.json                    daily AI agents
+        tasks.json                     the to-do list
+        notes.json                     saved notes
         Documents\\                    letters, notes and Word files Jarvis creates
         Screenshots\\
         Images\\                       pictures Jarvis generates
@@ -63,6 +66,18 @@ def memory_file() -> Path:
 
 def reminders_file() -> Path:
     return data_dir() / "reminders.json"
+
+
+def agents_file() -> Path:
+    return data_dir() / "agents.json"
+
+
+def tasks_file() -> Path:
+    return data_dir() / "tasks.json"
+
+
+def notes_file() -> Path:
+    return data_dir() / "notes.json"
 
 
 def undo_file() -> Path:

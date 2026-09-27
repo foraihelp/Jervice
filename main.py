@@ -28,7 +28,7 @@ from jarvis.brain.streaming import respond_speaking
 from jarvis.config import load_config
 from jarvis.server import run_server
 from jarvis.conversation import VoiceConversation
-from jarvis.tools import apps, memory_tools, registry, reminders, safety
+from jarvis.tools import agents, apps, memory_tools, notes, registry, reminders, safety, tasks
 from jarvis.tray import TrayApp
 from jarvis.ui.window import (
     create_main_window,
@@ -334,8 +334,25 @@ def main() -> None:
         push_message(window, "jarvis", text)
         tray.notify(text)
 
-    # Loaded from the user's data folder, so timers and remembered facts survive
-    # closing Jarvis. Started here (not earlier) because announcing one needs
+    def run_agent(agent: dict) -> None:
+        # A full brain turn, exactly like a typed command -- the agent's instruction
+        # can use any tool, not just speak a fixed line. Runs on the scheduler's own
+        # background thread, so a slow turn never blocks the poll loop or the window.
+        logger.info("Agent '%s' firing: %s", agent["name"], agent["instruction"])
+        before = registry.call_count()
+        reply = respond_speaking(
+            brain_holder.brain, agent["instruction"], speaker, "Sorry, I hit an error running this agent.",
+            on_text=lambda sentence: push_stream(window, sentence),
+        )
+        after = registry.call_count()
+        tools = registry.get_recent_calls(after - before) if after > before else []
+        display = f"[{agent['name']}] {reply}"
+        history.add("jarvis", display, tools)
+        push_message(window, "jarvis", display, tools)
+        tray.notify(display)
+
+    # Loaded from the user's data folder, so timers, agents and remembered facts
+    # survive closing Jarvis. Started here (not earlier) because firing one needs
     # the speaker, window and tray to exist.
     # What Jarvis is doing right now, on the window's status line: which tool is
     # running, or that it is waiting out the AI provider's rate limit.
@@ -346,6 +363,9 @@ def main() -> None:
     safety.configure(config.confirm_risky)
     memory_tools.configure(lambda: brain_holder.brain.memory)
     reminders.configure(storage.reminders_file(), announce_reminder)
+    agents.configure(storage.agents_file(), run_agent)
+    tasks.configure(storage.tasks_file())
+    notes.configure(storage.notes_file())
 
     def wake_word_thread() -> None:
         try:

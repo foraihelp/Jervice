@@ -240,6 +240,18 @@
   .mini-btn { padding: 7px 12px; border-radius: 7px; border: 1px solid var(--cy-22); font-size: 11.5px; color: var(--ink-bright); cursor: pointer; white-space: nowrap; transition: all 0.15s ease; }
   .mini-btn:hover { border-color: var(--ac-50); color: var(--ink); }
   .mini-btn.accent { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+  .agent-card { padding: 14px; border: 1px solid var(--cy-16); border-radius: 10px; background: var(--ac-6); margin-bottom: 10px; transition: opacity 0.15s ease; }
+  .agent-card.off { opacity: 0.55; }
+  .note-textarea { width: 100%; min-height: 70px; font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-bright); background: var(--surface); border: 1px solid var(--cy-16); padding: 9px 12px; border-radius: 6px; outline: none; resize: vertical; }
+  .task-item { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--cy-10); }
+  .task-item:last-child { border-bottom: none; }
+  .task-check { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--cy-22); flex-shrink: 0; cursor: pointer; position: relative; }
+  .task-check.done { background: var(--accent); border-color: var(--accent); }
+  .task-check.done::after { content: ''; position: absolute; left: 5px; top: 2px; width: 3px; height: 7px; border: solid var(--accent-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .task-text { flex: 1; font-size: 12.5px; color: var(--ink-bright); word-break: break-word; }
+  .task-item.done .task-text { text-decoration: line-through; color: var(--ink-dim); }
+  .task-delete { font-size: 16px; line-height: 1; color: var(--ink-faint); cursor: pointer; padding: 0 4px; flex-shrink: 0; }
+  .task-delete:hover { color: var(--danger); }
   .provider-option { color: var(--ink-soft); transition: all 0.15s ease; }
   .provider-option.selected { border-color: var(--ac-60) !important; color: var(--ink); background: var(--ac-8); box-shadow: 0 0 14px var(--ac-15); }
   .preset-btn:hover { border-color: var(--ac-50) !important; color: var(--ink) !important; }
@@ -314,6 +326,50 @@
       <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--ink-faint); margin-bottom:10px;">BACKUP AI (OPTIONAL)</div>
       <div style="font-size:11px; color:var(--ink-dim); margin-bottom:14px;">If the AI above is rate-limited, out of quota or offline, Jarvis answers with a backup instead of failing, and goes back to the main one when it recovers. Tip: Groq limits each model separately, so a smaller Groq model with the same key is a free backup.</div>
       <div id="backup-slots" style="display:flex; flex-direction:column; gap:16px;"></div>
+    </div>
+
+    <div style="height:1px; background:var(--cy-10);"></div>
+
+    <div>
+      <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--ink-faint); margin-bottom:10px;">AGENTS</div>
+      <div style="font-size:11px; color:var(--ink-dim); margin-bottom:14px;">An agent runs automatically once a day at a set time: Jarvis carries out its instruction as a full request (using any of its tools), then speaks and shows what it found. If Jarvis was closed at that time, it catches up shortly after the next start instead of waiting for tomorrow.</div>
+      <div id="agent-list"></div>
+      <div style="padding:14px; border:1px dashed var(--cy-22); border-radius:10px;">
+        <div style="font-size:11px; color:var(--ink-faint); margin-bottom:8px;">NEW AGENT</div>
+        <input id="agent-name" type="text" placeholder="Name, e.g. Morning briefing" style="margin-bottom:10px;">
+        <input id="agent-instruction" type="text" placeholder="What should it do? e.g. Summarize today's weather and my reminders" style="margin-bottom:10px;">
+        <div style="display:flex; gap:10px; align-items:center;">
+          <input id="agent-time" type="time" value="08:00" style="flex:1;">
+          <div id="agent-create-btn" class="mini-btn accent" style="flex-shrink:0;">Create</div>
+        </div>
+        <div id="agent-create-status" style="font-size:11px; margin-top:8px; color:var(--ink-faint);"></div>
+      </div>
+    </div>
+
+    <div style="height:1px; background:var(--cy-10);"></div>
+
+    <div>
+      <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--ink-faint); margin-bottom:10px;">TASKS</div>
+      <div id="task-list" style="margin-bottom:12px;"></div>
+      <div style="display:flex; gap:10px;">
+        <input id="task-text" type="text" placeholder="Add a task and press Enter" style="flex:1;">
+        <div id="task-create-btn" class="mini-btn accent" style="flex-shrink:0;">Add</div>
+      </div>
+      <div id="task-create-status" style="font-size:11px; margin-top:8px; color:var(--ink-faint);"></div>
+    </div>
+
+    <div style="height:1px; background:var(--cy-10);"></div>
+
+    <div>
+      <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--ink-faint); margin-bottom:10px;">NOTES</div>
+      <div id="note-list" style="margin-bottom:12px;"></div>
+      <div style="padding:14px; border:1px dashed var(--cy-22); border-radius:10px;">
+        <div style="font-size:11px; color:var(--ink-faint); margin-bottom:8px;">NEW NOTE</div>
+        <input id="note-title" type="text" placeholder="Title (optional)" style="margin-bottom:10px;">
+        <textarea id="note-content" class="note-textarea" placeholder="Write anything..."></textarea>
+        <div id="note-create-btn" class="mini-btn accent" style="margin-top:10px; display:inline-block;">Save note</div>
+        <div id="note-create-status" style="font-size:11px; margin-top:8px; color:var(--ink-faint);"></div>
+      </div>
     </div>
 
     <div style="height:1px; background:var(--cy-10);"></div>
@@ -929,8 +985,260 @@
     return Array.from(document.querySelectorAll('.backup-slot')).map((w) => w.readEntry()).filter(Boolean);
   }
 
+  // ---- agents
+  function fmtTime12(hhmm) {
+    const [h, m] = hhmm.split(':').map(Number);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const h12 = ((h + 11) % 12) + 1;
+    return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+  }
+  function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+  function renderAgents(list) {
+    const box = $('agent-list');
+    box.innerHTML = '';
+    if (!list.length) {
+      box.innerHTML = '<div style="font-size:11.5px; color:var(--ink-dim); margin-bottom:14px;">No agents yet. Create one below.</div>';
+      return;
+    }
+    list.forEach((a) => {
+      const card = document.createElement('div');
+      card.className = 'agent-card' + (a.enabled ? '' : ' off');
+      card.dataset.id = a.id;
+      card.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+          <div style="min-width:0;">
+            <div style="font-size:13px; color:var(--ink-bright); font-weight:600;">${escapeHtml(a.name)}</div>
+            <div style="font-size:11px; color:var(--ink-faint); margin-top:2px;">Daily at ${fmtTime12(a.time)}</div>
+            <div style="font-size:11.5px; color:var(--ink-soft); margin-top:6px;">${escapeHtml(a.instruction)}</div>
+          </div>
+          <div class="toggle ${a.enabled ? 'on' : 'off'} no-drag agent-toggle" data-tip="Turn this agent on or off"><div class="knob"></div></div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:10px;">
+          <div class="mini-btn agent-run">Run now</div>
+          <div class="mini-btn agent-delete" style="color:var(--danger); border-color:var(--dg-40);">Delete</div>
+        </div>
+        <div class="agent-status" style="font-size:11px; margin-top:8px;"></div>`;
+      box.appendChild(card);
+    });
+  }
+
+  async function loadAgents() {
+    try {
+      renderAgents(await window.pywebview.api.list_agents());
+    } catch (e) {
+      $('agent-list').innerHTML = '<div style="font-size:11.5px; color:var(--danger);">Could not load agents: ' + e + '</div>';
+    }
+  }
+
+  $('agent-list').addEventListener('click', async (e) => {
+    const card = e.target.closest('.agent-card');
+    if (!card) return;
+    const id = card.dataset.id;
+    const statusEl = card.querySelector('.agent-status');
+    if (e.target.closest('.agent-toggle')) {
+      const toggle = e.target.closest('.agent-toggle');
+      const nowOn = !toggle.classList.contains('on');
+      toggle.className = 'toggle no-drag agent-toggle ' + (nowOn ? 'on' : 'off');
+      card.className = 'agent-card' + (nowOn ? '' : ' off');
+      await window.pywebview.api.set_agent_enabled(id, nowOn);
+    } else if (e.target.closest('.agent-delete')) {
+      await window.pywebview.api.delete_agent(id);
+      loadAgents();
+    } else if (e.target.closest('.agent-run')) {
+      statusEl.textContent = 'Running now…';
+      statusEl.style.color = 'var(--ink-faint)';
+      await window.pywebview.api.run_agent_now(id);
+      statusEl.textContent = 'Started -- check the main window for the result.';
+      statusEl.style.color = 'var(--good)';
+    }
+  });
+
+  $('agent-create-btn').addEventListener('click', async () => {
+    const name = $('agent-name').value.trim();
+    const instruction = $('agent-instruction').value.trim();
+    const time = $('agent-time').value || '08:00';
+    if (!name || !instruction) {
+      $('agent-create-status').textContent = 'Give it a name and an instruction.';
+      $('agent-create-status').style.color = 'var(--warn)';
+      return;
+    }
+    $('agent-create-status').textContent = 'Creating…';
+    $('agent-create-status').style.color = 'var(--ink-faint)';
+    try {
+      const result = await window.pywebview.api.create_agent(name, instruction, time);
+      if (!result.ok) {
+        $('agent-create-status').textContent = result.message || 'Could not create the agent.';
+        $('agent-create-status').style.color = 'var(--danger)';
+        return;
+      }
+      $('agent-name').value = '';
+      $('agent-instruction').value = '';
+      $('agent-time').value = '08:00';
+      $('agent-create-status').textContent = '';
+      loadAgents();
+    } catch (e) {
+      $('agent-create-status').textContent = 'Error creating agent: ' + e;
+      $('agent-create-status').style.color = 'var(--danger)';
+    }
+  });
+
+  // ---- tasks
+  function renderTasks(list) {
+    const box = $('task-list');
+    box.innerHTML = '';
+    if (!list.length) {
+      box.innerHTML = '<div style="font-size:11.5px; color:var(--ink-dim);">Nothing on your list yet.</div>';
+      return;
+    }
+    list.forEach((t) => {
+      const row = document.createElement('div');
+      row.className = 'task-item' + (t.done ? ' done' : '');
+      row.dataset.id = t.id;
+      row.innerHTML = `
+        <div class="task-check ${t.done ? 'done' : ''}" data-tip="Mark as ${t.done ? 'not done' : 'done'}"></div>
+        <div class="task-text">${escapeHtml(t.text)}</div>
+        <div class="task-delete" data-tip="Delete">&times;</div>`;
+      box.appendChild(row);
+    });
+  }
+
+  async function loadTasks() {
+    try {
+      renderTasks(await window.pywebview.api.list_tasks());
+    } catch (e) {
+      $('task-list').innerHTML = '<div style="font-size:11.5px; color:var(--danger);">Could not load tasks: ' + e + '</div>';
+    }
+  }
+
+  $('task-list').addEventListener('click', async (e) => {
+    const row = e.target.closest('.task-item');
+    if (!row) return;
+    const id = row.dataset.id;
+    if (e.target.closest('.task-check')) {
+      const nowDone = !row.classList.contains('done');
+      await window.pywebview.api.set_task_done(id, nowDone);
+      loadTasks();
+    } else if (e.target.closest('.task-delete')) {
+      await window.pywebview.api.delete_task(id);
+      loadTasks();
+    }
+  });
+
+  async function addTask() {
+    const text = $('task-text').value.trim();
+    if (!text) return;
+    $('task-create-status').textContent = '';
+    try {
+      const result = await window.pywebview.api.create_task(text);
+      if (!result.ok) {
+        $('task-create-status').textContent = result.message || 'Could not add that task.';
+        $('task-create-status').style.color = 'var(--danger)';
+        return;
+      }
+      $('task-text').value = '';
+      loadTasks();
+    } catch (e) {
+      $('task-create-status').textContent = 'Error adding task: ' + e;
+      $('task-create-status').style.color = 'var(--danger)';
+    }
+  }
+  $('task-create-btn').addEventListener('click', addTask);
+  $('task-text').addEventListener('keydown', (e) => { if (e.key === 'Enter') addTask(); });
+
+  // ---- notes
+  function renderNotes(list) {
+    const box = $('note-list');
+    box.innerHTML = '';
+    if (!list.length) {
+      box.innerHTML = '<div style="font-size:11.5px; color:var(--ink-dim); margin-bottom:14px;">No notes yet.</div>';
+      return;
+    }
+    list.forEach((n) => {
+      const card = document.createElement('div');
+      card.className = 'agent-card';
+      card.dataset.id = n.id;
+      card.innerHTML = `
+        <div style="font-size:13px; color:var(--ink-bright); font-weight:600;">${escapeHtml(n.title)}</div>
+        <div class="note-preview" style="font-size:11.5px; color:var(--ink-soft); margin-top:6px; white-space:pre-wrap;">${escapeHtml(n.content)}</div>
+        <div style="display:flex; gap:8px; margin-top:10px;">
+          <div class="mini-btn note-edit">Edit</div>
+          <div class="mini-btn note-delete" style="color:var(--danger); border-color:var(--dg-40);">Delete</div>
+        </div>`;
+      box.appendChild(card);
+    });
+  }
+
+  async function loadNotes() {
+    try {
+      renderNotes(await window.pywebview.api.list_notes());
+    } catch (e) {
+      $('note-list').innerHTML = '<div style="font-size:11.5px; color:var(--danger);">Could not load notes: ' + e + '</div>';
+    }
+  }
+
+  $('note-list').addEventListener('click', async (e) => {
+    const card = e.target.closest('.agent-card');
+    if (!card) return;
+    const id = card.dataset.id;
+    if (e.target.closest('.note-delete')) {
+      await window.pywebview.api.delete_note(id);
+      loadNotes();
+      return;
+    }
+    if (e.target.closest('.note-edit')) {
+      const preview = card.querySelector('.note-preview');
+      if (card.querySelector('.note-textarea')) return;  // already editing
+      const textarea = document.createElement('textarea');
+      textarea.className = 'note-textarea';
+      textarea.style.marginTop = '6px';
+      textarea.value = preview.textContent;
+      preview.replaceWith(textarea);
+      const btnRow = card.querySelector('.note-edit').parentElement;
+      btnRow.innerHTML = '<div class="mini-btn accent note-save">Save</div><div class="mini-btn note-cancel">Cancel</div>';
+      return;
+    }
+    if (e.target.closest('.note-cancel')) {
+      loadNotes();
+      return;
+    }
+    if (e.target.closest('.note-save')) {
+      const textarea = card.querySelector('.note-textarea');
+      await window.pywebview.api.update_note(id, textarea.value);
+      loadNotes();
+    }
+  });
+
+  async function saveNote() {
+    const title = $('note-title').value.trim();
+    const content = $('note-content').value.trim();
+    if (!title && !content) return;
+    $('note-create-status').textContent = '';
+    try {
+      const result = await window.pywebview.api.create_note(title, content);
+      if (!result.ok) {
+        $('note-create-status').textContent = result.message || 'Could not save that note.';
+        $('note-create-status').style.color = 'var(--danger)';
+        return;
+      }
+      $('note-title').value = '';
+      $('note-content').value = '';
+      loadNotes();
+    } catch (e) {
+      $('note-create-status').textContent = 'Error saving note: ' + e;
+      $('note-create-status').style.color = 'var(--danger)';
+    }
+  }
+  $('note-create-btn').addEventListener('click', saveNote);
+
   window.addEventListener('pywebviewready', loadStorage);
   window.addEventListener('pywebviewready', loadSettings);
+  window.addEventListener('pywebviewready', loadAgents);
+  window.addEventListener('pywebviewready', loadTasks);
+  window.addEventListener('pywebviewready', loadNotes);
 </script>
 </body>
 </html>

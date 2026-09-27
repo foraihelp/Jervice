@@ -394,6 +394,115 @@ class SettingsAPI:
         if self.window is not None:
             self.window.destroy()
 
+    # ---------------------------------------------------------------- agents
+
+    def list_agents(self) -> list[dict[str, Any]]:
+        from jarvis.tools import agents
+
+        scheduler = agents.get_scheduler()
+        return scheduler.list() if scheduler else []
+
+    def create_agent(self, name: str, instruction: str, time: str) -> dict[str, Any]:
+        from jarvis.tools import agents
+
+        scheduler = agents.get_scheduler()
+        if scheduler is None:
+            return {"ok": False, "message": "Agents aren't available right now."}
+        try:
+            agent = scheduler.create(name, instruction, time)
+        except ValueError as exc:
+            return {"ok": False, "message": str(exc)}
+        return {"ok": True, "agent": agent}
+
+    def set_agent_enabled(self, agent_id: str, enabled: bool) -> dict[str, Any]:
+        from jarvis.tools import agents
+
+        scheduler = agents.get_scheduler()
+        agent = scheduler.set_enabled(agent_id, enabled) if scheduler else None
+        return {"ok": agent is not None, "agent": agent}
+
+    def delete_agent(self, agent_id: str) -> dict[str, Any]:
+        from jarvis.tools import agents
+
+        scheduler = agents.get_scheduler()
+        agent = scheduler.delete(agent_id) if scheduler else None
+        return {"ok": agent is not None}
+
+    def run_agent_now(self, agent_id: str) -> dict[str, Any]:
+        from jarvis.tools import agents
+
+        scheduler = agents.get_scheduler()
+        agent = scheduler.run_now(agent_id) if scheduler else None
+        return {"ok": agent is not None}
+
+    # ----------------------------------------------------------------- tasks
+
+    def list_tasks(self) -> list[dict[str, Any]]:
+        from jarvis.tools import tasks
+
+        store = tasks.get_store()
+        return store.list() if store else []
+
+    def create_task(self, text: str) -> dict[str, Any]:
+        from jarvis.tools import tasks
+
+        store = tasks.get_store()
+        if store is None:
+            return {"ok": False, "message": "Tasks aren't available right now."}
+        try:
+            task = store.create(text)
+        except ValueError as exc:
+            return {"ok": False, "message": str(exc)}
+        return {"ok": True, "task": task}
+
+    def set_task_done(self, task_id: str, done: bool) -> dict[str, Any]:
+        from jarvis.tools import tasks
+
+        store = tasks.get_store()
+        task = store.set_done(task_id, done) if store else None
+        return {"ok": task is not None, "task": task}
+
+    def delete_task(self, task_id: str) -> dict[str, Any]:
+        from jarvis.tools import tasks
+
+        store = tasks.get_store()
+        task = store.delete(task_id) if store else None
+        return {"ok": task is not None}
+
+    # ----------------------------------------------------------------- notes
+
+    def list_notes(self) -> list[dict[str, Any]]:
+        from jarvis.tools import notes
+
+        store = notes.get_store()
+        return store.list() if store else []
+
+    def create_note(self, title: str, content: str) -> dict[str, Any]:
+        from jarvis.tools import notes
+
+        store = notes.get_store()
+        if store is None:
+            return {"ok": False, "message": "Notes aren't available right now."}
+        try:
+            note = store.create(title, content)
+        except ValueError as exc:
+            return {"ok": False, "message": str(exc)}
+        return {"ok": True, "note": note}
+
+    def update_note(self, note_id: str, content: str) -> dict[str, Any]:
+        from jarvis.tools import notes
+
+        store = notes.get_store()
+        note = store.update(note_id, content) if store else None
+        return {"ok": note is not None, "note": note}
+
+    def delete_note(self, note_id: str) -> dict[str, Any]:
+        from jarvis.tools import notes
+
+        store = notes.get_store()
+        note = store.delete(note_id) if store else None
+        return {"ok": note is not None}
+
 
 def apply_look_js(look: str, theme: str) -> str:
     """The exact JS that puts a window's page into the given look/theme -- shared between the

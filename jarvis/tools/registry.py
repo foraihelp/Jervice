@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Optional
 
-from jarvis.tools import apps, files, images, location, memory_tools, reminders, safety, system, system_monitor, vision, web, windows_control
+from jarvis.tools import agents, apps, files, images, location, memory_tools, notes, reminders, safety, system, system_monitor, tasks, vision, web, windows_control
 
 logger = logging.getLogger("jarvis.tools.registry")
 
@@ -228,6 +228,142 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "create_agent",
+        "description": "Create a daily agent: at a set time every day, Jarvis runs the given instruction as a full request (can use any tool) and speaks/shows the result, unattended. Use for recurring things like a morning briefing or an evening summary -- not for something that should happen once (use set_reminder) or right now (just do it).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Short name, e.g. 'Morning briefing'."},
+                "instruction": {"type": "string", "description": "What the agent should do each time it runs, phrased as a request, e.g. 'Summarize today's weather and my reminders.'"},
+                "time": {"type": "string", "description": "Local time to run every day, 24-hour 'HH:MM', e.g. '08:00'."},
+            },
+            "required": ["name", "instruction", "time"],
+        },
+    },
+    {
+        "name": "list_agents",
+        "description": "List the daily agents that are currently set up, whether each is on or off, and what it does.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "toggle_agent",
+        "description": "Turn a daily agent on or off (without deleting it), matched by its id or name.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "The agent's id, or words from its name."},
+                "enabled": {"type": "boolean", "description": "true to turn it on, false to turn it off."},
+            },
+            "required": ["query", "enabled"],
+        },
+    },
+    {
+        "name": "delete_agent",
+        "description": "Permanently delete a daily agent, matched by its id or name.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "The agent's id, or words from its name."}},
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "run_agent_now",
+        "description": "Runs one daily agent immediately in the background instead of waiting for its scheduled time -- useful right after creating one, to check it does what you meant. Returns right away; the actual result is spoken/shown a little later, separately.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "The agent's id, or words from its name."}},
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "create_task",
+        "description": "Add an item to the user's to-do list.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"text": {"type": "string", "description": "The task, e.g. 'buy milk'."}},
+            "required": ["text"],
+        },
+    },
+    {
+        "name": "list_tasks",
+        "description": "List what's on the to-do list, open items first, and how many are done.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "complete_task",
+        "description": "Mark a to-do item as done, matched by its id or words from its text.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "The task's id, or words from it."}},
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "reopen_task",
+        "description": "Mark a to-do item that was done as not done again, matched by its id or words from its text.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "The task's id, or words from it."}},
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "delete_task",
+        "description": "Permanently remove a to-do item, matched by its id or words from its text.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "The task's id, or words from it."}},
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "create_note",
+        "description": "Save a freeform note for the user.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "Short title. Leave blank to make one from the content."},
+                "content": {"type": "string", "description": "The note's text."},
+            },
+            "required": ["content"],
+        },
+    },
+    {
+        "name": "list_notes",
+        "description": "List the user's saved notes by title, most recently updated first.",
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "read_note",
+        "description": "Read back the full text of a note, matched by its id or words from its title.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "The note's id, or words from its title."}},
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "update_note",
+        "description": "Replace a note's content, matched by its id or words from its title.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "The note's id, or words from its title."},
+                "content": {"type": "string", "description": "The note's new full text."},
+            },
+            "required": ["query", "content"],
+        },
+    },
+    {
+        "name": "delete_note",
+        "description": "Permanently delete a note, matched by its id or words from its title.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "The note's id, or words from its title."}},
+            "required": ["query"],
+        },
+    },
+    {
         "name": "remember",
         "description": "Save something the user asked you to remember about themselves (name, family, preferences). Use a short label so a later value replaces an older one. Only when they explicitly ask.",
         "input_schema": {
@@ -361,6 +497,21 @@ TOOL_DISPATCH: dict[str, Callable[..., str]] = {
     "set_reminder": lambda when, message: reminders.set_reminder(when, message),
     "list_reminders": lambda: reminders.list_reminders(),
     "cancel_reminder": lambda query: reminders.cancel_reminder(query),
+    "create_agent": lambda name, instruction, time: agents.create_agent(name, instruction, time),
+    "list_agents": lambda: agents.list_agents(),
+    "toggle_agent": lambda query, enabled: agents.toggle_agent(query, enabled),
+    "delete_agent": lambda query: agents.delete_agent(query),
+    "run_agent_now": lambda query: agents.run_agent_now(query),
+    "create_task": lambda text: tasks.create_task(text),
+    "list_tasks": lambda: tasks.list_tasks(),
+    "complete_task": lambda query: tasks.complete_task(query),
+    "reopen_task": lambda query: tasks.reopen_task(query),
+    "delete_task": lambda query: tasks.delete_task(query),
+    "create_note": lambda content, title="": notes.create_note(title, content),
+    "list_notes": lambda: notes.list_notes(),
+    "read_note": lambda query: notes.read_note(query),
+    "update_note": lambda query, content: notes.update_note(query, content),
+    "delete_note": lambda query: notes.delete_note(query),
     "remember": lambda key, value: memory_tools.remember(key, value),
     "forget": lambda key: memory_tools.forget(key),
     "get_system_status": lambda: system_monitor.get_system_status(),
