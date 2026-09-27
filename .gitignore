@@ -3,6 +3,9 @@ venv/
 data/
 __pycache__/
 *.pyc
+# Generated per-machine at window-open time (see jarvis/ui/window.py's _html_with_look) --
+# only ever appears here at all when running unpackaged with the default PROJECT_ROOT.
+ui_cache/
 
 # PyInstaller build output (regenerate with build_exe.bat) and the
 # installer's compiled output (regenerate with installer/jarvis.iss) --

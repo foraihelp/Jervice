@@ -224,6 +224,20 @@ class Config:
         return bool((self.raw.get("safety") or {}).get("confirm_risky", True))
 
     @property
+    def ui_look(self) -> str:
+        """"classic" (the original dark/cyan look) or "modern" (a warmer, more spacious one).
+        Applied before either window's page even starts loading -- see jarvis/ui/window.py."""
+        value = (self.raw.get("ui") or {}).get("look", "classic") or "classic"
+        return value if value in ("classic", "modern") else "classic"
+
+    @property
+    def ui_theme(self) -> str:
+        """"light" / "dark" (forced regardless of Windows' setting) or "system" (follows it).
+        Only meaningful for the modern look -- classic is always dark."""
+        value = (self.raw.get("ui") or {}).get("theme", "system") or "system"
+        return value if value in ("light", "dark", "system") else "system"
+
+    @property
     def effective_system_prompt(self) -> str:
         """system_prompt, with a language instruction appended when
         reply_language pins a specific output language. This is the
@@ -503,6 +517,10 @@ def save_settings(payload: dict[str, Any]) -> None:
         data.setdefault("conversation", {})["follow_up_seconds"] = max(0, min(30, float(payload["follow_up_seconds"])))
     if "confirm_risky" in payload:
         data.setdefault("safety", {})["confirm_risky"] = bool(payload["confirm_risky"])
+    if payload.get("ui_look") in ("classic", "modern"):
+        data.setdefault("ui", {})["look"] = payload["ui_look"]
+    if payload.get("ui_theme") in ("light", "dark", "system"):
+        data.setdefault("ui", {})["theme"] = payload["ui_theme"]
     if "reply_language" in payload:
         data.setdefault("brain", {})["reply_language"] = (payload["reply_language"] or "").strip().lower()
     if "server_enabled" in payload:

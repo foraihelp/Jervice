@@ -5,9 +5,9 @@
   const tip = document.createElement('div');
   Object.assign(tip.style, {
     position: 'fixed', zIndex: '99999', pointerEvents: 'none', display: 'none',
-    maxWidth: '250px', padding: '6px 10px', background: '#0E1620', color: '#D7E2EA',
-    border: '1px solid rgba(111,227,255,0.35)', borderRadius: '6px',
-    font: "500 11.5px/1.4 'Sora', system-ui, sans-serif", letterSpacing: '0',
+    maxWidth: '250px', padding: '6px 10px', background: 'var(--surface)', color: 'var(--ink-bright)',
+    border: '1px solid var(--ac-35)', borderRadius: '6px',
+    font: "500 11.5px/1.4 var(--font-ui)", letterSpacing: '0',
     textTransform: 'none', boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
   });
   document.body.appendChild(tip);

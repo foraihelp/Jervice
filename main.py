@@ -260,7 +260,8 @@ def main() -> None:
                 "also switch AI providers there.",
             )
             open_settings_window(
-                config, brain_holder, wake_word_listener=wake_word_listener, speaker=speaker, transcriber=transcriber
+                config, brain_holder, wake_word_listener=wake_word_listener, speaker=speaker, transcriber=transcriber,
+                main_window=window,
             )
 
         try:

@@ -1,6 +1,14 @@
 # Jarvis configuration
 # Restart the app after changing this file.
 
+ui:
+  # "classic" (the original dark/cyan look) or "modern" (a warmer, more spacious one).
+  # Easiest to change from Settings (gear icon) -- Appearance, at the top.
+  look: "classic"
+  # "system" (follows Windows' light/dark setting), or "light" / "dark" to force one.
+  # Only meaningful when look is "modern" -- classic is always dark.
+  theme: "system"
+
 wake_word:
   # openWakeWord ships pretrained models including "hey_jarvis".
   # See jarvis/audio/wake_word.py for how this is loaded.

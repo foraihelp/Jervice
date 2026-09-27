@@ -177,7 +177,7 @@ class JarvisAPI:
     def open_settings(self) -> None:
         open_settings_window(
             self.config, self.brain_holder, wake_word_listener=self.wake_word_listener,
-            speaker=self.speaker, transcriber=self.transcriber,
+            speaker=self.speaker, transcriber=self.transcriber, main_window=self.window,
         )
 
     def quit(self) -> None:
@@ -194,16 +194,19 @@ class SettingsAPI:
     # immediately instead of needing a full restart.
     _BRAIN_AFFECTING_KEYS = {"provider", "model", "base_url", "api_key", "reply_language", "fallbacks"}
 
-    def __init__(self, config, brain_holder, wake_word_listener=None, speaker=None, transcriber=None):
+    def __init__(self, config, brain_holder, wake_word_listener=None, speaker=None, transcriber=None, main_window=None):
         self.config = config
         self.brain_holder = brain_holder
         self.wake_word_listener = wake_word_listener
         self.speaker = speaker
         self.transcriber = transcriber
+        self.main_window = main_window  # so an appearance change here repaints the main window too
         self.window = None  # set by open_settings_window() right after the window exists
 
     def get_settings(self) -> dict[str, Any]:
         return {
+            "ui_look": self.config.ui_look,
+            "ui_theme": self.config.ui_theme,
             "wake_word_threshold": self.config.wake_word_threshold,
             "tts_rate": self.config.tts_rate,
             "tts_volume": self.config.tts_volume,
@@ -330,6 +333,16 @@ class SettingsAPI:
             from jarvis.tools import safety
 
             safety.configure(self.config.confirm_risky)  # applies immediately, no restart
+        if "ui_look" in payload or "ui_theme" in payload:
+            # Both windows repaint at once -- no restart, and no flash on the next open either,
+            # since create_main_window/open_settings_window read this same config on the way up.
+            js = apply_look_js(self.config.ui_look, self.config.ui_theme)
+            for win in (self.window, self.main_window):
+                if win is not None:
+                    try:
+                        win.evaluate_js(js)
+                    except Exception:
+                        logger.debug("Could not live-apply the look/theme to a window", exc_info=True)
 
         applied_live = False
         if self._BRAIN_AFFECTING_KEYS & payload.keys():
@@ -382,6 +395,41 @@ class SettingsAPI:
             self.window.destroy()
 
 
+def apply_look_js(look: str, theme: str) -> str:
+    """The exact JS that puts a window's page into the given look/theme -- shared between the
+    inline bootstrap script (see _html_with_look, avoids a flash of the wrong look on open) and
+    live-applying a Settings change to an already-open window (see SettingsAPI.save_settings)."""
+    theme_js = "document.documentElement.removeAttribute('data-theme');" if theme == "system" else f"document.documentElement.dataset.theme = {theme!r};"
+    return f"document.documentElement.dataset.look = {look!r}; {theme_js}"
+
+
+def _html_with_look(filename: str, config) -> Path:
+    """The page's own source, with its look/theme applied by an inline <script> right at the top
+    of <head> -- run synchronously as the page parses, before the CSS below it or anything in
+    <body> is even seen, so the window never flashes the wrong look before settling on the right
+    one. Written to a real file under the (always-writable, per-user) data folder and that path
+    returned, rather than handed to webview.create_window(html=...): that alternative uses
+    WebView2's NavigateToString, which turned out to be unreliable in combination with this
+    app's own window setup (hung intermittently in testing) -- an ordinary file:// load, exactly
+    like every other window in this app already does, doesn't have that problem. tooltips.js's
+    normal <script src="tooltips.js"> also would not resolve from this temp file's own folder,
+    so its source is inlined here instead of kept as a separate reference."""
+    html = (ASSETS_DIR / filename).read_text(encoding="utf-8")
+    bootstrap = f"<script>{apply_look_js(config.ui_look, config.ui_theme)}</script>"
+    assert html.count("<head>") == 1
+    html = html.replace("<head>", "<head>\n" + bootstrap, 1)
+    tooltips_js = (ASSETS_DIR / "tooltips.js").read_text(encoding="utf-8")
+    assert html.count('<script src="tooltips.js"></script>') == 1
+    html = html.replace('<script src="tooltips.js"></script>', f"<script>\n{tooltips_js}\n</script>", 1)
+
+    from jarvis.config import PROJECT_ROOT
+    from jarvis.fsutil import atomic_write_text
+
+    out_path = PROJECT_ROOT / "ui_cache" / filename
+    atomic_write_text(out_path, html)
+    return out_path
+
+
 def create_main_window(brain_holder, transcriber, config, tray, wake_word_listener=None, speaker=None):
     """Creates and returns the main pywebview window. Must be called
     before webview.start()."""
@@ -397,7 +445,7 @@ def create_main_window(brain_holder, transcriber, config, tray, wake_word_listen
     )
     window = webview.create_window(
         "Jarvis",
-        str(ASSETS_DIR / "main.html"),
+        str(_html_with_look("main.html", config)),
         js_api=api,
         width=1180,
         height=760,
@@ -424,7 +472,8 @@ def create_main_window(brain_holder, transcriber, config, tray, wake_word_listen
     return window
 
 
-def open_settings_window(config, brain_holder, wake_word_listener=None, speaker=None, transcriber=None) -> None:
+def open_settings_window(config, brain_holder, wake_word_listener=None, speaker=None, transcriber=None,
+                          main_window=None) -> None:
     """Opens the settings window, or re-focuses it if already open."""
     global _settings_window
 
@@ -437,11 +486,18 @@ def open_settings_window(config, brain_holder, wake_word_listener=None, speaker=
             _settings_window = None  # window was destroyed; fall through and recreate
 
     import webview
+    from jarvis.config import load_config
 
-    api = SettingsAPI(config, brain_holder, wake_word_listener=wake_word_listener, speaker=speaker, transcriber=transcriber)
+    # Reloaded fresh rather than trusting the caller's `config`: JarvisAPI holds onto the Config
+    # object it was built with for its own lifetime, so without this, closing Settings after a
+    # change and reopening it (without restarting Jarvis) would show what was there *before* that
+    # change -- including its own look/theme -- until the app itself restarted.
+    config = load_config()
+    api = SettingsAPI(config, brain_holder, wake_word_listener=wake_word_listener, speaker=speaker,
+                       transcriber=transcriber, main_window=main_window)
     window = webview.create_window(
         "Jarvis Settings",
-        str(ASSETS_DIR / "settings.html"),
+        str(_html_with_look("settings.html", config)),
         js_api=api,
         width=640,
         height=760,

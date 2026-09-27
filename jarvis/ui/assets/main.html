@@ -5,18 +5,219 @@
 <title>Jarvis</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
+  :root {
+    --ac-10: rgba(111,227,255,0.1);
+    --ac-15: rgba(111,227,255,0.15);
+    --ac-18: rgba(111,227,255,0.18);
+    --ac-28: rgba(111,227,255,0.28);
+    --ac-35: rgba(111,227,255,0.35);
+    --ac-40: rgba(111,227,255,0.4);
+    --ac-45: rgba(111,227,255,0.45);
+    --ac-50: rgba(111,227,255,0.5);
+    --ac-6: rgba(111,227,255,0.06);
+    --ac-60: rgba(111,227,255,0.6);
+    --ac-8: rgba(111,227,255,0.08);
+    --ac-85: rgba(111,227,255,0.85);
+    --accent: #6FE3FF;
+    --accent-hover: #9CEEFF;
+    --accent-ink: #04141C;
+    --bg: #05070b;
+    --cy-10: rgba(120,190,255,0.10);
+    --cy-12: rgba(120,190,255,0.12);
+    --cy-14: rgba(120,190,255,0.14);
+    --cy-16: rgba(120,190,255,0.16);
+    --cy-18: rgba(120,190,255,0.18);
+    --cy-22: rgba(120,190,255,0.22);
+    --cy-8: rgba(120,190,255,0.08);
+    --danger: #E36B6B;
+    --dg-10: rgba(227,107,107,0.1);
+    --dg-40: rgba(227,107,107,0.4);
+    --gd-10: rgba(90,214,150,0.1);
+    --gd-40: rgba(90,214,150,0.4);
+    --gl-10: rgba(79,166,255,0.10);
+    --gl-35: rgba(79,166,255,0.35);
+    --gl-5: rgba(79,166,255,0.05);
+    --gl-6: rgba(79,166,255,0.06);
+    --gl-9: rgba(79,166,255,0.09);
+    --good: #5AD696;
+    --hi-90: rgba(180,240,255,0.9);
+    --ink: #E8EEF4;
+    --ink-bright: #D7E2EA;
+    --ink-dim: #4A5A6A;
+    --ink-faint: #56677A;
+    --ink-soft: #8CA0B3;
+    --surface: #0A0F16;
+    --tool-ink: #5E9BB8;
+    --warn: #E3A34A;
+    --wn-25: rgba(227,163,74,0.25);
+    --wn-8: rgba(227,163,74,0.08);
+    --font-ui: 'Sora', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    color-scheme: dark;
+  }
+  /* -------------------------------------------------- modern look: a separate light/dark theme,
+     switched on in Settings -- appearance.js (see jarvis/ui/theme.py) sets data-look/data-theme
+     before this stylesheet is even parsed, so there is no flash of the wrong look on open. */
+  [data-look="modern"] {
+    --ac-10: rgba(168,99,31,0.1);
+    --ac-15: rgba(168,99,31,0.15);
+    --ac-18: rgba(168,99,31,0.18);
+    --ac-28: rgba(168,99,31,0.28);
+    --ac-35: rgba(168,99,31,0.35);
+    --ac-40: rgba(168,99,31,0.4);
+    --ac-45: rgba(168,99,31,0.45);
+    --ac-50: rgba(168,99,31,0.5);
+    --ac-6: rgba(168,99,31,0.06);
+    --ac-60: rgba(168,99,31,0.6);
+    --ac-8: rgba(168,99,31,0.08);
+    --ac-85: rgba(168,99,31,0.85);
+    --accent: #A8631F;
+    --accent-hover: #8B4F16;
+    --accent-ink: #FFFDF9;
+    --bg: #F5F3EF;
+    --cy-10: #E8E3D6;
+    --cy-12: #E8E3D6;
+    --cy-14: #DDD6C7;
+    --cy-16: #DDD6C7;
+    --cy-18: #DDD6C7;
+    --cy-22: #DDD6C7;
+    --cy-8: #E8E3D6;
+    --danger: #A6412E;
+    --dg-10: rgba(166,65,46,0.1);
+    --dg-40: rgba(166,65,46,0.4);
+    --gd-10: rgba(62,122,82,0.1);
+    --gd-40: rgba(62,122,82,0.4);
+    --gl-10: transparent;
+    --gl-35: transparent;
+    --gl-5: transparent;
+    --gl-6: transparent;
+    --gl-9: transparent;
+    --good: #3E7A52;
+    --hi-90: transparent;
+    --ink: #211E19;
+    --ink-bright: #34302A;
+    --ink-dim: #9B9385;
+    --ink-faint: #9B9385;
+    --ink-soft: #6B6459;
+    --surface: #FFFFFF;
+    --tool-ink: #8B6A3F;
+    --warn: #8B6A20;
+    --wn-25: rgba(168,99,31,0.25);
+    --wn-8: rgba(168,99,31,0.08);
+    --font-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    [data-look="modern"]:not([data-theme="light"]) {
+    --ac-10: rgba(221,162,93,0.1);
+    --ac-15: rgba(221,162,93,0.15);
+    --ac-18: rgba(221,162,93,0.18);
+    --ac-28: rgba(221,162,93,0.28);
+    --ac-35: rgba(221,162,93,0.35);
+    --ac-40: rgba(221,162,93,0.4);
+    --ac-45: rgba(221,162,93,0.45);
+    --ac-50: rgba(221,162,93,0.5);
+    --ac-6: rgba(221,162,93,0.06);
+    --ac-60: rgba(221,162,93,0.6);
+    --ac-8: rgba(221,162,93,0.08);
+    --ac-85: rgba(221,162,93,0.85);
+    --accent: #DDA25D;
+    --accent-hover: #EAB776;
+    --accent-ink: #211705;
+    --bg: #19170F;
+    --cy-10: #2E2A1F;
+    --cy-12: #2E2A1F;
+    --cy-14: #3A3527;
+    --cy-16: #3A3527;
+    --cy-18: #3A3527;
+    --cy-22: #3A3527;
+    --cy-8: #2E2A1F;
+    --danger: #E1998A;
+    --dg-10: rgba(225,153,138,0.1);
+    --dg-40: rgba(225,153,138,0.4);
+    --gd-10: rgba(123,190,147,0.1);
+    --gd-40: rgba(123,190,147,0.4);
+    --gl-10: transparent;
+    --gl-35: transparent;
+    --gl-5: transparent;
+    --gl-6: transparent;
+    --gl-9: transparent;
+    --good: #7BBE93;
+    --hi-90: transparent;
+    --ink: #F1ECE1;
+    --ink-bright: #EDE6D8;
+    --ink-dim: #7D7563;
+    --ink-faint: #7D7563;
+    --ink-soft: #B3A992;
+    --surface: #221F17;
+    --tool-ink: #C9A468;
+    --warn: #FFB454;
+    --wn-25: rgba(221,162,93,0.25);
+    --wn-8: rgba(221,162,93,0.08);
+      color-scheme: dark;
+    }
+  }
+  [data-look="modern"][data-theme="dark"] {
+    --ac-10: rgba(221,162,93,0.1);
+    --ac-15: rgba(221,162,93,0.15);
+    --ac-18: rgba(221,162,93,0.18);
+    --ac-28: rgba(221,162,93,0.28);
+    --ac-35: rgba(221,162,93,0.35);
+    --ac-40: rgba(221,162,93,0.4);
+    --ac-45: rgba(221,162,93,0.45);
+    --ac-50: rgba(221,162,93,0.5);
+    --ac-6: rgba(221,162,93,0.06);
+    --ac-60: rgba(221,162,93,0.6);
+    --ac-8: rgba(221,162,93,0.08);
+    --ac-85: rgba(221,162,93,0.85);
+    --accent: #DDA25D;
+    --accent-hover: #EAB776;
+    --accent-ink: #211705;
+    --bg: #19170F;
+    --cy-10: #2E2A1F;
+    --cy-12: #2E2A1F;
+    --cy-14: #3A3527;
+    --cy-16: #3A3527;
+    --cy-18: #3A3527;
+    --cy-22: #3A3527;
+    --cy-8: #2E2A1F;
+    --danger: #E1998A;
+    --dg-10: rgba(225,153,138,0.1);
+    --dg-40: rgba(225,153,138,0.4);
+    --gd-10: rgba(123,190,147,0.1);
+    --gd-40: rgba(123,190,147,0.4);
+    --gl-10: transparent;
+    --gl-35: transparent;
+    --gl-5: transparent;
+    --gl-6: transparent;
+    --gl-9: transparent;
+    --good: #7BBE93;
+    --hi-90: transparent;
+    --ink: #F1ECE1;
+    --ink-bright: #EDE6D8;
+    --ink-dim: #7D7563;
+    --ink-faint: #7D7563;
+    --ink-soft: #B3A992;
+    --surface: #221F17;
+    --tool-ink: #C9A468;
+    --warn: #FFB454;
+    --wn-25: rgba(221,162,93,0.25);
+    --wn-8: rgba(221,162,93,0.08);
+    color-scheme: dark;
+  }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; }
   body {
-    font-family: 'Sora', system-ui, -apple-system, sans-serif;
-    color: #E8EEF4;
-    background: #05070b;
+    font-family: var(--font-ui);
+    color: var(--ink);
+    background: var(--bg);
   }
-  a { color: #6FE3FF; text-decoration: none; }
-  a:hover { color: #9CEEFF; }
-  ::selection { background: rgba(111,227,255,0.28); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: var(--accent-hover); }
+  ::selection { background: var(--ac-28); }
   ::-webkit-scrollbar { width: 8px; }
-  ::-webkit-scrollbar-thumb { background: rgba(120,190,255,0.18); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb { background: var(--cy-18); border-radius: 4px; }
 
   .drag { -webkit-app-region: drag; }
   .no-drag { -webkit-app-region: no-drag; }
@@ -30,43 +231,43 @@
   .icon-btn:hover { opacity: 1; }
 
   #update-pill:hover { filter: brightness(1.15); }
-  #update-pill.accent { border-color: rgba(111,227,255,0.4); color: #6FE3FF; background: rgba(111,227,255,0.1); }
-  #update-pill.success { border-color: rgba(90,214,150,0.4); color: #5AD696; background: rgba(90,214,150,0.1); }
-  #update-pill.error { border-color: rgba(227,107,107,0.4); color: #E36B6B; background: rgba(227,107,107,0.1); }
+  #update-pill.accent { border-color: var(--ac-40); color: var(--accent); background: var(--ac-10); }
+  #update-pill.success { border-color: var(--gd-40); color: var(--good); background: var(--gd-10); }
+  #update-pill.error { border-color: var(--dg-40); color: var(--danger); background: var(--dg-10); }
   .update-spinner { width: 9px; height: 9px; border-radius: 50%; border: 1.6px solid currentColor; border-top-color: transparent; animation: jv-spin-slow 0.7s linear infinite; flex-shrink: 0; display: inline-block; }
 
   #command-input {
-    background: transparent; border: none; outline: none; color: #EAF6FC;
-    font-family: 'Sora', sans-serif; font-size: 13px; width: 100%;
+    background: transparent; border: none; outline: none; color: var(--ink);
+    font-family: var(--font-ui); font-size: 13px; width: 100%;
   }
-  #command-input::placeholder { color: #4A5A6A; }
+  #command-input::placeholder { color: var(--ink-dim); }
 </style>
 </head>
 <body>
 
 <div style="width:100%; height:100%; display:flex; flex-direction:column; position:relative;">
 
-  <div style="position:absolute; inset:0; pointer-events:none; background: radial-gradient(480px 320px at 85% -10%, rgba(79,166,255,0.10), transparent 60%), radial-gradient(420px 300px at -5% 110%, rgba(79,166,255,0.06), transparent 60%);"></div>
+  <div style="position:absolute; inset:0; pointer-events:none; background: radial-gradient(480px 320px at 85% -10%, var(--gl-10), transparent 60%), radial-gradient(420px 300px at -5% 110%, var(--gl-6), transparent 60%);"></div>
 
   <!-- title bar (draggable) -->
-  <div class="drag pywebview-drag-region" style="position:relative; height:52px; min-height:52px; display:flex; align-items:center; justify-content:space-between; padding:0 18px; border-bottom:1px solid rgba(120,190,255,0.12);">
+  <div class="drag pywebview-drag-region" style="position:relative; height:52px; min-height:52px; display:flex; align-items:center; justify-content:space-between; padding:0 18px; border-bottom:1px solid var(--cy-12);">
     <div style="display:flex; align-items:center; gap:10px;">
       <svg data-tip="Jarvis, your voice assistant" width="22" height="22" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="9.5" stroke="oklch(78% 0.14 200)" stroke-width="1.4" stroke-dasharray="3 4"/>
-        <circle cx="12" cy="12" r="5.5" stroke="oklch(78% 0.14 200)" stroke-width="1.4"/>
-        <circle cx="12" cy="12" r="2" fill="oklch(78% 0.14 200)"/>
+        <circle cx="12" cy="12" r="9.5" stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="3 4"/>
+        <circle cx="12" cy="12" r="5.5" stroke="var(--accent)" stroke-width="1.4"/>
+        <circle cx="12" cy="12" r="2" fill="var(--accent)"/>
       </svg>
       <div style="font-size:13px; font-weight:600; letter-spacing:0.14em;">JARVIS</div>
-      <div id="app-version" data-tip="Installed version of Jarvis" style="font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600; letter-spacing:0.02em; color:#8CA0B3; background:rgba(120,190,255,0.08); border:1px solid rgba(120,190,255,0.18); border-radius:999px; padding:2px 9px;"></div>
-      <div data-tip="Jarvis is running on this PC and ready" style="display:flex; align-items:center; gap:6px; margin-left:2px; padding:4px 10px; border:1px solid rgba(120,190,255,0.22); border-radius:20px;">
-        <div id="online-dot" style="width:6px; height:6px; border-radius:50%; background:oklch(78% 0.14 200); box-shadow:0 0 8px oklch(78% 0.14 200); animation:jv-pulse 2.4s ease-in-out infinite;"></div>
-        <div id="online-label" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.08em; color:#8CA0B3;">ONLINE &middot; LOCAL</div>
+      <div id="app-version" data-tip="Installed version of Jarvis" style="font-family:var(--font-mono); font-size:10.5px; font-weight:600; letter-spacing:0.02em; color:var(--ink-soft); background:var(--cy-8); border:1px solid var(--cy-18); border-radius:999px; padding:2px 9px;"></div>
+      <div data-tip="Jarvis is running on this PC and ready" style="display:flex; align-items:center; gap:6px; margin-left:2px; padding:4px 10px; border:1px solid var(--cy-22); border-radius:20px;">
+        <div id="online-dot" style="width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px var(--accent); animation:jv-pulse 2.4s ease-in-out infinite;"></div>
+        <div id="online-label" style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.08em; color:var(--ink-soft);">ONLINE &middot; LOCAL</div>
       </div>
     </div>
     <div class="no-drag" style="display:flex; align-items:center; gap:16px;">
-      <div id="update-pill" class="no-drag" data-tip="Software update: click to check, download or install" style="display:none; align-items:center; gap:7px; padding:5px 12px; border-radius:999px; font-size:11.5px; font-weight:500; background:rgba(120,190,255,0.08); border:1px solid rgba(120,190,255,0.18); color:#8CA0B3; white-space:nowrap; cursor:pointer;"></div>
-      <svg id="minimize-btn" class="icon-btn" data-tip="Minimize" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14" stroke="#8CA0B3" stroke-width="1.6" stroke-linecap="round"/></svg>
-      <svg id="hide-btn" class="icon-btn" data-tip="Hide to the system tray. Jarvis keeps listening for the wake word" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#8CA0B3" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <div id="update-pill" class="no-drag" data-tip="Software update: click to check, download or install" style="display:none; align-items:center; gap:7px; padding:5px 12px; border-radius:999px; font-size:11.5px; font-weight:500; background:var(--cy-8); border:1px solid var(--cy-18); color:var(--ink-soft); white-space:nowrap; cursor:pointer;"></div>
+      <svg id="minimize-btn" class="icon-btn" data-tip="Minimize" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14" stroke="var(--ink-soft)" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <svg id="hide-btn" class="icon-btn" data-tip="Hide to the system tray. Jarvis keeps listening for the wake word" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="var(--ink-soft)" stroke-width="1.6" stroke-linecap="round"/></svg>
     </div>
   </div>
 
@@ -74,90 +275,90 @@
   <div style="position:relative; flex:1; display:flex; min-height:0;">
 
     <!-- sidebar -->
-    <nav style="width:64px; min-width:64px; display:flex; flex-direction:column; align-items:center; gap:22px; padding:20px 0; border-right:1px solid rgba(120,190,255,0.10);">
-      <div data-tip="Assistant" style="width:38px; height:38px; border-radius:9px; background:rgba(111,227,255,0.10); border:1px solid rgba(111,227,255,0.35); display:flex; align-items:center; justify-content:center;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 15c2-6 5-9 8-9s6 3 8 9" stroke="#6FE3FF" stroke-width="1.6" stroke-linecap="round"/><path d="M4 18c2-5 5-7.5 8-7.5s6 2.5 8 7.5" stroke="#6FE3FF" stroke-width="1.6" stroke-linecap="round" opacity="0.5"/></svg>
+    <nav style="width:64px; min-width:64px; display:flex; flex-direction:column; align-items:center; gap:22px; padding:20px 0; border-right:1px solid var(--cy-10);">
+      <div data-tip="Assistant" style="width:38px; height:38px; border-radius:9px; background:var(--ac-10); border:1px solid var(--ac-35); display:flex; align-items:center; justify-content:center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 15c2-6 5-9 8-9s6 3 8 9" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round"/><path d="M4 18c2-5 5-7.5 8-7.5s6 2.5 8 7.5" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" opacity="0.5"/></svg>
       </div>
       <div style="flex:1;"></div>
-      <svg id="settings-btn" class="icon-btn" data-tip="Settings: AI provider, voice, microphone, language" width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="2.6" stroke="#8CA0B3" stroke-width="1.5"/><path d="M12 3.5v2.4M12 18.1v2.4M20.5 12h-2.4M5.9 12H3.5M17.7 6.3l-1.7 1.7M8 16l-1.7 1.7M17.7 17.7L16 16M8 8L6.3 6.3" stroke="#8CA0B3" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <svg id="settings-btn" class="icon-btn" data-tip="Settings: AI provider, voice, microphone, language" width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="2.6" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M12 3.5v2.4M12 18.1v2.4M20.5 12h-2.4M5.9 12H3.5M17.7 6.3l-1.7 1.7M8 16l-1.7 1.7M17.7 17.7L16 16M8 8L6.3 6.3" stroke="var(--ink-soft)" stroke-width="1.5" stroke-linecap="round"/></svg>
     </nav>
 
     <!-- chat column -->
     <main style="flex:1; min-width:0; display:flex; flex-direction:column;">
 
-      <div style="display:flex; align-items:center; gap:18px; padding:14px 22px; border-bottom:1px solid rgba(120,190,255,0.08);">
+      <div style="display:flex; align-items:center; gap:18px; padding:14px 22px; border-bottom:1px solid var(--cy-8);">
         <div data-tip="Microphone status. The bars move while Jarvis is listening to you" style="display:flex; align-items:center; gap:7px;">
           <div id="mic-bars" style="display:flex; align-items:flex-end; gap:2px; height:16px;">
-            <div style="width:3px; background:oklch(78% 0.14 200); border-radius:2px; animation:jv-bar 1.1s ease-in-out infinite; animation-delay:0s;"></div>
-            <div style="width:3px; background:oklch(78% 0.14 200); border-radius:2px; animation:jv-bar 1.1s ease-in-out infinite; animation-delay:0.15s;"></div>
-            <div style="width:3px; background:oklch(78% 0.14 200); border-radius:2px; animation:jv-bar 1.1s ease-in-out infinite; animation-delay:0.3s;"></div>
-            <div style="width:3px; background:oklch(78% 0.14 200); border-radius:2px; animation:jv-bar 1.1s ease-in-out infinite; animation-delay:0.45s;"></div>
+            <div style="width:3px; background:var(--accent); border-radius:2px; animation:jv-bar 1.1s ease-in-out infinite; animation-delay:0s;"></div>
+            <div style="width:3px; background:var(--accent); border-radius:2px; animation:jv-bar 1.1s ease-in-out infinite; animation-delay:0.15s;"></div>
+            <div style="width:3px; background:var(--accent); border-radius:2px; animation:jv-bar 1.1s ease-in-out infinite; animation-delay:0.3s;"></div>
+            <div style="width:3px; background:var(--accent); border-radius:2px; animation:jv-bar 1.1s ease-in-out infinite; animation-delay:0.45s;"></div>
           </div>
-          <div id="mic-label" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.08em; color:#8CA0B3;">MIC ARMED</div>
+          <div id="mic-label" style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.08em; color:var(--ink-soft);">MIC ARMED</div>
         </div>
-        <div style="width:1px; height:14px; background:rgba(120,190,255,0.14);"></div>
-        <div id="status-line" data-tip="What Jarvis is doing right now" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.08em; color:#56677A;">WAKE WORD &middot; HEY JARVIS</div>
+        <div style="width:1px; height:14px; background:var(--cy-14);"></div>
+        <div id="status-line" data-tip="What Jarvis is doing right now" style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.08em; color:var(--ink-faint);">WAKE WORD &middot; HEY JARVIS</div>
         <div style="flex:1;"></div>
-        <div id="model-label" data-tip="AI model answering your requests" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.08em; color:#56677A;">&nbsp;</div>
+        <div id="model-label" data-tip="AI model answering your requests" style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.08em; color:var(--ink-faint);">&nbsp;</div>
       </div>
 
       <div id="transcript" style="flex:1; overflow-y:auto; padding:22px 26px; display:flex; flex-direction:column; gap:18px;"></div>
 
       <!-- typed command row -->
       <div style="padding:0 22px;">
-        <div data-tip="Type a command and press Enter" style="display:flex; align-items:center; gap:10px; background:#0A0F16; border:1px solid rgba(120,190,255,0.14); border-radius:10px; padding:9px 14px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="opacity:0.5; flex-shrink:0;"><path d="M4 12h11M11 6l6 6-6 6" stroke="#6FE3FF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div data-tip="Type a command and press Enter" style="display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--cy-14); border-radius:10px; padding:9px 14px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="opacity:0.5; flex-shrink:0;"><path d="M4 12h11M11 6l6 6-6 6" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <input id="command-input" type="text" placeholder="Type a command, or hold the mic to talk&hellip;">
-          <svg id="screen-vision-btn" class="icon-btn" data-tip="Let Jarvis see your screen and explain what's on it" width="17" height="17" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;"><rect x="3" y="4" width="18" height="12" rx="2" stroke="#8CA0B3" stroke-width="1.6"/><line x1="8" y1="20" x2="16" y2="20" stroke="#8CA0B3" stroke-width="1.6" stroke-linecap="round"/><line x1="12" y1="16" x2="12" y2="20" stroke="#8CA0B3" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <svg id="screen-vision-btn" class="icon-btn" data-tip="Let Jarvis see your screen and explain what's on it" width="17" height="17" viewBox="0 0 24 24" fill="none" style="flex-shrink:0;"><rect x="3" y="4" width="18" height="12" rx="2" stroke="var(--ink-soft)" stroke-width="1.6"/><line x1="8" y1="20" x2="16" y2="20" stroke="var(--ink-soft)" stroke-width="1.6" stroke-linecap="round"/><line x1="12" y1="16" x2="12" y2="20" stroke="var(--ink-soft)" stroke-width="1.6" stroke-linecap="round"/></svg>
         </div>
       </div>
 
       <!-- composer / orb bar -->
       <div style="display:flex; align-items:center; justify-content:center; gap:26px; padding:16px 22px 24px;">
-        <svg id="mute-btn" class="icon-btn" data-tip="Mute microphone. Stops listening for the wake word" width="20" height="20" viewBox="0 0 24 24" fill="none"><path id="mute-icon-mic" d="M12 3a3 3 0 013 3v6a3 3 0 01-6 0V6a3 3 0 013-3z" stroke="#8CA0B3" stroke-width="1.5"/><path d="M6 11a6 6 0 0012 0M12 17v3" stroke="#8CA0B3" stroke-width="1.5" stroke-linecap="round"/><path id="mute-slash" d="M18.5 5.5l-13 13" stroke="#E36B6B" stroke-width="1.5" stroke-linecap="round" style="display:none;"/></svg>
+        <svg id="mute-btn" class="icon-btn" data-tip="Mute microphone. Stops listening for the wake word" width="20" height="20" viewBox="0 0 24 24" fill="none"><path id="mute-icon-mic" d="M12 3a3 3 0 013 3v6a3 3 0 01-6 0V6a3 3 0 013-3z" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M6 11a6 6 0 0012 0M12 17v3" stroke="var(--ink-soft)" stroke-width="1.5" stroke-linecap="round"/><path id="mute-slash" d="M18.5 5.5l-13 13" stroke="var(--danger)" stroke-width="1.5" stroke-linecap="round" style="display:none;"/></svg>
 
         <div id="orb" class="no-drag" data-tip="Click, then speak a command (no wake word needed)" style="position:relative; width:78px; height:78px; display:flex; align-items:center; justify-content:center; cursor:pointer;">
-          <div style="position:absolute; inset:0; border-radius:50%; border:1px dashed rgba(111,227,255,0.35); animation:jv-spin-slow 14s linear infinite;"></div>
-          <div id="orb-core" style="position:absolute; width:58px; height:58px; border-radius:50%; background:radial-gradient(circle at 35% 30%, rgba(180,240,255,0.9), rgba(79,166,255,0.35) 55%, rgba(79,166,255,0.05) 75%); box-shadow:0 0 28px rgba(111,227,255,0.45); transition:box-shadow 0.2s ease;"></div>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="position:relative;"><path d="M12 3a3 3 0 013 3v6a3 3 0 01-6 0V6a3 3 0 013-3z" stroke="#04141C" stroke-width="1.8"/><path d="M6 11a6 6 0 0012 0M12 17v3" stroke="#04141C" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <div style="position:absolute; inset:0; border-radius:50%; border:1px dashed var(--ac-35); animation:jv-spin-slow 14s linear infinite;"></div>
+          <div id="orb-core" style="position:absolute; width:58px; height:58px; border-radius:50%; background:radial-gradient(circle at 35% 30%, var(--hi-90), var(--gl-35) 55%, var(--gl-5) 75%); box-shadow:0 0 28px var(--ac-45); transition:box-shadow 0.2s ease;"></div>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style="position:relative;"><path d="M12 3a3 3 0 013 3v6a3 3 0 01-6 0V6a3 3 0 013-3z" stroke="var(--accent-ink)" stroke-width="1.8"/><path d="M6 11a6 6 0 0012 0M12 17v3" stroke="var(--accent-ink)" stroke-width="1.8" stroke-linecap="round"/></svg>
         </div>
 
-        <svg id="stop-btn" class="icon-btn no-drag" data-tip="Stop speaking (Esc)" width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#E36B6B" stroke-width="1.5"/><rect x="8.5" y="8.5" width="7" height="7" rx="1" fill="#E36B6B"/></svg>
+        <svg id="stop-btn" class="icon-btn no-drag" data-tip="Stop speaking (Esc)" width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="var(--danger)" stroke-width="1.5"/><rect x="8.5" y="8.5" width="7" height="7" rx="1" fill="var(--danger)"/></svg>
 
-        <svg id="quit-btn" class="icon-btn" data-tip="Quit Jarvis completely (power off). The window X only hides it to the tray" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3v10M6 13a6 6 0 0012 0" stroke="#8CA0B3" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <svg id="quit-btn" class="icon-btn" data-tip="Quit Jarvis completely (power off). The window X only hides it to the tray" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3v10M6 13a6 6 0 0012 0" stroke="var(--ink-soft)" stroke-width="1.5" stroke-linecap="round"/></svg>
       </div>
     </main>
 
     <!-- telemetry -->
-    <aside style="width:236px; min-width:236px; border-left:1px solid rgba(120,190,255,0.10); padding:18px 16px; display:flex; flex-direction:column; gap:20px; overflow-y:auto;">
+    <aside style="width:236px; min-width:236px; border-left:1px solid var(--cy-10); padding:18px 16px; display:flex; flex-direction:column; gap:20px; overflow-y:auto;">
 
       <div>
-        <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:10px;">STATUS</div>
+        <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--ink-faint); margin-bottom:10px;">STATUS</div>
         <div style="display:flex; flex-direction:column; gap:8px;">
-          <div data-tip="Whether Jarvis is listening for &quot;Hey Jarvis&quot;" style="display:flex; justify-content:space-between; font-size:12px;"><span style="color:#8CA0B3;">Wake word</span><span id="tel-wakeword" style="color:#6FE3FF; font-family:'JetBrains Mono',monospace;">ARMED</span></div>
-          <div data-tip="Whether the microphone is active" style="display:flex; justify-content:space-between; font-size:12px;"><span style="color:#8CA0B3;">Microphone</span><span id="tel-mic" style="color:#6FE3FF; font-family:'JetBrains Mono',monospace;">ACTIVE</span></div>
-          <div data-tip="AI model in use" style="display:flex; justify-content:space-between; font-size:12px;"><span style="color:#8CA0B3;">Model</span><span id="tel-model" style="color:#D7E2EA; font-family:'JetBrains Mono',monospace; font-size:11px;">&nbsp;</span></div>
+          <div data-tip="Whether Jarvis is listening for &quot;Hey Jarvis&quot;" style="display:flex; justify-content:space-between; font-size:12px;"><span style="color:var(--ink-soft);">Wake word</span><span id="tel-wakeword" style="color:var(--accent); font-family:var(--font-mono);">ARMED</span></div>
+          <div data-tip="Whether the microphone is active" style="display:flex; justify-content:space-between; font-size:12px;"><span style="color:var(--ink-soft);">Microphone</span><span id="tel-mic" style="color:var(--accent); font-family:var(--font-mono);">ACTIVE</span></div>
+          <div data-tip="AI model in use" style="display:flex; justify-content:space-between; font-size:12px;"><span style="color:var(--ink-soft);">Model</span><span id="tel-model" style="color:var(--ink-bright); font-family:var(--font-mono); font-size:11px;">&nbsp;</span></div>
         </div>
       </div>
 
-      <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
+      <div style="height:1px; background:var(--cy-10);"></div>
 
       <div>
-        <div data-tip="Where Jarvis can be reached from: this PC and the optional remote API for the phone app" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:10px;">CONNECTIONS</div>
+        <div data-tip="Where Jarvis can be reached from: this PC and the optional remote API for the phone app" style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--ink-faint); margin-bottom:10px;">CONNECTIONS</div>
         <div id="tel-connections" style="display:flex; flex-direction:column; gap:10px;"></div>
       </div>
 
-      <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
+      <div style="height:1px; background:var(--cy-10);"></div>
 
       <div>
-        <div data-tip="Actions Jarvis recently performed for you (opening apps, searching the web, and so on)" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:10px;">RECENT TOOLS</div>
-        <div id="tel-tools" style="display:flex; flex-direction:column; gap:7px; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#5E9BB8;"></div>
+        <div data-tip="Actions Jarvis recently performed for you (opening apps, searching the web, and so on)" style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--ink-faint); margin-bottom:10px;">RECENT TOOLS</div>
+        <div id="tel-tools" style="display:flex; flex-direction:column; gap:7px; font-family:var(--font-mono); font-size:10.5px; color:var(--tool-ink);"></div>
       </div>
 
       <div style="flex:1;"></div>
       <div data-tip="How long Jarvis has been running this session" style="display:flex; align-items:center; gap:8px; opacity:0.7;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="#56677A" stroke-width="1.4"/><path d="M12 8v5l3 1.6" stroke="#56677A" stroke-width="1.4" stroke-linecap="round"/></svg>
-        <span id="tel-uptime" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#56677A;">UPTIME 00:00:00</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="var(--ink-faint)" stroke-width="1.4"/><path d="M12 8v5l3 1.6" stroke="var(--ink-faint)" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <span id="tel-uptime" style="font-family:var(--font-mono); font-size:10px; color:var(--ink-faint);">UPTIME 00:00:00</span>
       </div>
     </aside>
   </div>
@@ -214,10 +415,10 @@
       row.id = 'live-reply';
       row.style.cssText = 'display:flex; align-items:flex-start; gap:12px; max-width:640px;';
       row.innerHTML = `
-        <div style="width:28px; height:28px; min-width:28px; border-radius:50%; border:1px solid rgba(111,227,255,0.35); background:rgba(111,227,255,0.08); display:flex; align-items:center; justify-content:center;">
-          <div style="width:8px; height:8px; border-radius:50%; background:oklch(78% 0.14 200); box-shadow:0 0 10px oklch(78% 0.14 200);"></div>
+        <div style="width:28px; height:28px; min-width:28px; border-radius:50%; border:1px solid var(--ac-35); background:var(--ac-8); display:flex; align-items:center; justify-content:center;">
+          <div style="width:8px; height:8px; border-radius:50%; background:var(--accent); box-shadow:0 0 10px var(--accent);"></div>
         </div>
-        <div id="live-reply-text" style="background:#0A0F16; border:1px solid rgba(120,190,255,0.14); padding:12px 16px; border-radius:2px 14px 14px 14px; font-size:14px; line-height:1.55; color:#D7E2EA; white-space:pre-wrap; overflow-wrap:anywhere;"></div>`;
+        <div id="live-reply-text" style="background:var(--surface); border:1px solid var(--cy-14); padding:12px 16px; border-radius:2px 14px 14px 14px; font-size:14px; line-height:1.55; color:var(--ink-bright); white-space:pre-wrap; overflow-wrap:anywhere;"></div>`;
       transcriptEl.appendChild(row);
       textEl = document.getElementById('live-reply-text');
     }
@@ -248,26 +449,26 @@
     const row = document.createElement('div');
     if (role === 'user') {
       row.style.cssText = 'display:flex; justify-content:flex-end;';
-      row.innerHTML = `<div style="background:rgba(111,227,255,0.10); border:1px solid rgba(111,227,255,0.28); padding:12px 16px; border-radius:14px 2px 14px 14px; font-size:14px; line-height:1.55; color:#EAF6FC; max-width:520px; white-space:pre-wrap; overflow-wrap:anywhere;">${escapeHtml(text)}</div>`;
+      row.innerHTML = `<div style="background:var(--ac-10); border:1px solid var(--ac-28); padding:12px 16px; border-radius:14px 2px 14px 14px; font-size:14px; line-height:1.55; color:var(--ink); max-width:520px; white-space:pre-wrap; overflow-wrap:anywhere;">${escapeHtml(text)}</div>`;
     } else if (role === 'jarvis') {
       const toolsHtml = (tools && tools.length)
-        ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">${tools.map(t => `<div style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#5E9BB8; background:rgba(111,227,255,0.06); border:1px solid rgba(111,227,255,0.18); padding:3px 9px; border-radius:5px;">${escapeHtml(t)}</div>`).join('')}</div>`
+        ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">${tools.map(t => `<div style="font-family:var(--font-mono); font-size:10px; color:var(--tool-ink); background:var(--ac-6); border:1px solid var(--ac-18); padding:3px 9px; border-radius:5px;">${escapeHtml(t)}</div>`).join('')}</div>`
         : '';
       row.style.cssText = 'display:flex; align-items:flex-start; gap:12px; max-width:640px;';
       row.innerHTML = `
-        <div style="width:28px; height:28px; min-width:28px; border-radius:50%; border:1px solid rgba(111,227,255,0.35); background:rgba(111,227,255,0.08); display:flex; align-items:center; justify-content:center;">
-          <div style="width:8px; height:8px; border-radius:50%; background:oklch(78% 0.14 200); box-shadow:0 0 10px oklch(78% 0.14 200);"></div>
+        <div style="width:28px; height:28px; min-width:28px; border-radius:50%; border:1px solid var(--ac-35); background:var(--ac-8); display:flex; align-items:center; justify-content:center;">
+          <div style="width:8px; height:8px; border-radius:50%; background:var(--accent); box-shadow:0 0 10px var(--accent);"></div>
         </div>
         <div style="display:flex; flex-direction:column; gap:8px;">
-          <div style="background:#0A0F16; border:1px solid rgba(120,190,255,0.14); padding:12px 16px; border-radius:2px 14px 14px 14px; font-size:14px; line-height:1.55; color:#D7E2EA; white-space:pre-wrap; overflow-wrap:anywhere;">${escapeHtml(text)}</div>
+          <div style="background:var(--surface); border:1px solid var(--cy-14); padding:12px 16px; border-radius:2px 14px 14px 14px; font-size:14px; line-height:1.55; color:var(--ink-bright); white-space:pre-wrap; overflow-wrap:anywhere;">${escapeHtml(text)}</div>
           ${toolsHtml}
-          <div class="copy-btn no-drag" data-tip="Copy this reply to the clipboard" style="align-self:flex-start; font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.1em; color:#56677A; cursor:pointer; padding:2px 0;">COPY</div>
+          <div class="copy-btn no-drag" data-tip="Copy this reply to the clipboard" style="align-self:flex-start; font-family:var(--font-mono); font-size:9.5px; letter-spacing:0.1em; color:var(--ink-faint); cursor:pointer; padding:2px 0;">COPY</div>
         </div>`;
       const copyBtn = row.querySelector('.copy-btn');
       copyBtn.addEventListener('click', () => copyText(text, copyBtn));
     } else {
       row.style.cssText = 'display:flex; justify-content:center;';
-      row.innerHTML = `<div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#E3A34A; background:rgba(227,163,74,0.08); border:1px solid rgba(227,163,74,0.25); padding:6px 14px; border-radius:8px;">${escapeHtml(text)}</div>`;
+      row.innerHTML = `<div style="font-family:var(--font-mono); font-size:11px; color:var(--warn); background:var(--wn-8); border:1px solid var(--wn-25); padding:6px 14px; border-radius:8px;">${escapeHtml(text)}</div>`;
     }
     transcriptEl.appendChild(row);
     scrollToBottom();
@@ -284,8 +485,8 @@
       const bars = document.querySelectorAll('#mic-bars > div');
       bars.forEach(b => b.style.animationName = listening ? 'jv-bar-active' : 'jv-bar');
       document.getElementById('orb-core').style.boxShadow = listening
-        ? '0 0 44px rgba(111,227,255,0.85)'
-        : '0 0 28px rgba(111,227,255,0.45)';
+        ? '0 0 44px var(--ac-85)'
+        : '0 0 28px var(--ac-45)';
     }
     if (status.statusLine) {
       // While the speech model is downloading/loading, the idle line says so instead.
@@ -314,15 +515,15 @@
     const el = document.getElementById('tel-connections');
     el.innerHTML = list.map(name => `
       <div style="display:flex; align-items:center; gap:8px;">
-        <div style="width:6px; height:6px; border-radius:50%; background:oklch(78% 0.14 200); box-shadow:0 0 6px oklch(78% 0.14 200);"></div>
-        <span style="font-size:12px; color:#D7E2EA;">${escapeHtml(name)}</span>
+        <div style="width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 6px var(--accent);"></div>
+        <span style="font-size:12px; color:var(--ink-bright);">${escapeHtml(name)}</span>
       </div>`).join('');
   }
 
   function setTools(list) {
     const el = document.getElementById('tel-tools');
     el.innerHTML = list.slice(-6).reverse().map(t => `<div>${escapeHtml(t)}</div>`).join('')
-      || '<div style="color:#4A5A6A;">none yet</div>';
+      || '<div style="color:var(--ink-dim);">none yet</div>';
   }
 
   function setMuted(isMuted) {

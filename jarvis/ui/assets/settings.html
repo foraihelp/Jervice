@@ -5,101 +5,324 @@
 <title>Jarvis Settings</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
+  :root {
+    --ac-10: rgba(111,227,255,0.1);
+    --ac-15: rgba(111,227,255,0.15);
+    --ac-18: rgba(111,227,255,0.18);
+    --ac-28: rgba(111,227,255,0.28);
+    --ac-35: rgba(111,227,255,0.35);
+    --ac-40: rgba(111,227,255,0.4);
+    --ac-45: rgba(111,227,255,0.45);
+    --ac-50: rgba(111,227,255,0.5);
+    --ac-6: rgba(111,227,255,0.06);
+    --ac-60: rgba(111,227,255,0.6);
+    --ac-8: rgba(111,227,255,0.08);
+    --ac-85: rgba(111,227,255,0.85);
+    --accent: #6FE3FF;
+    --accent-hover: #9CEEFF;
+    --accent-ink: #04141C;
+    --bg: #05070b;
+    --cy-10: rgba(120,190,255,0.10);
+    --cy-12: rgba(120,190,255,0.12);
+    --cy-14: rgba(120,190,255,0.14);
+    --cy-16: rgba(120,190,255,0.16);
+    --cy-18: rgba(120,190,255,0.18);
+    --cy-22: rgba(120,190,255,0.22);
+    --cy-8: rgba(120,190,255,0.08);
+    --danger: #E36B6B;
+    --dg-10: rgba(227,107,107,0.1);
+    --dg-40: rgba(227,107,107,0.4);
+    --gd-10: rgba(90,214,150,0.1);
+    --gd-40: rgba(90,214,150,0.4);
+    --gl-10: rgba(79,166,255,0.10);
+    --gl-35: rgba(79,166,255,0.35);
+    --gl-5: rgba(79,166,255,0.05);
+    --gl-6: rgba(79,166,255,0.06);
+    --gl-9: rgba(79,166,255,0.09);
+    --good: #5AD696;
+    --hi-90: rgba(180,240,255,0.9);
+    --ink: #E8EEF4;
+    --ink-bright: #D7E2EA;
+    --ink-dim: #4A5A6A;
+    --ink-faint: #56677A;
+    --ink-soft: #8CA0B3;
+    --surface: #0A0F16;
+    --tool-ink: #5E9BB8;
+    --warn: #E3A34A;
+    --wn-25: rgba(227,163,74,0.25);
+    --wn-8: rgba(227,163,74,0.08);
+    --font-ui: 'Sora', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    color-scheme: dark;
+  }
+  /* -------------------------------------------------- modern look: a separate light/dark theme,
+     switched on in Settings -- appearance.js (see jarvis/ui/theme.py) sets data-look/data-theme
+     before this stylesheet is even parsed, so there is no flash of the wrong look on open. */
+  [data-look="modern"] {
+    --ac-10: rgba(168,99,31,0.1);
+    --ac-15: rgba(168,99,31,0.15);
+    --ac-18: rgba(168,99,31,0.18);
+    --ac-28: rgba(168,99,31,0.28);
+    --ac-35: rgba(168,99,31,0.35);
+    --ac-40: rgba(168,99,31,0.4);
+    --ac-45: rgba(168,99,31,0.45);
+    --ac-50: rgba(168,99,31,0.5);
+    --ac-6: rgba(168,99,31,0.06);
+    --ac-60: rgba(168,99,31,0.6);
+    --ac-8: rgba(168,99,31,0.08);
+    --ac-85: rgba(168,99,31,0.85);
+    --accent: #A8631F;
+    --accent-hover: #8B4F16;
+    --accent-ink: #FFFDF9;
+    --bg: #F5F3EF;
+    --cy-10: #E8E3D6;
+    --cy-12: #E8E3D6;
+    --cy-14: #DDD6C7;
+    --cy-16: #DDD6C7;
+    --cy-18: #DDD6C7;
+    --cy-22: #DDD6C7;
+    --cy-8: #E8E3D6;
+    --danger: #A6412E;
+    --dg-10: rgba(166,65,46,0.1);
+    --dg-40: rgba(166,65,46,0.4);
+    --gd-10: rgba(62,122,82,0.1);
+    --gd-40: rgba(62,122,82,0.4);
+    --gl-10: transparent;
+    --gl-35: transparent;
+    --gl-5: transparent;
+    --gl-6: transparent;
+    --gl-9: transparent;
+    --good: #3E7A52;
+    --hi-90: transparent;
+    --ink: #211E19;
+    --ink-bright: #34302A;
+    --ink-dim: #9B9385;
+    --ink-faint: #9B9385;
+    --ink-soft: #6B6459;
+    --surface: #FFFFFF;
+    --tool-ink: #8B6A3F;
+    --warn: #8B6A20;
+    --wn-25: rgba(168,99,31,0.25);
+    --wn-8: rgba(168,99,31,0.08);
+    --font-ui: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    [data-look="modern"]:not([data-theme="light"]) {
+    --ac-10: rgba(221,162,93,0.1);
+    --ac-15: rgba(221,162,93,0.15);
+    --ac-18: rgba(221,162,93,0.18);
+    --ac-28: rgba(221,162,93,0.28);
+    --ac-35: rgba(221,162,93,0.35);
+    --ac-40: rgba(221,162,93,0.4);
+    --ac-45: rgba(221,162,93,0.45);
+    --ac-50: rgba(221,162,93,0.5);
+    --ac-6: rgba(221,162,93,0.06);
+    --ac-60: rgba(221,162,93,0.6);
+    --ac-8: rgba(221,162,93,0.08);
+    --ac-85: rgba(221,162,93,0.85);
+    --accent: #DDA25D;
+    --accent-hover: #EAB776;
+    --accent-ink: #211705;
+    --bg: #19170F;
+    --cy-10: #2E2A1F;
+    --cy-12: #2E2A1F;
+    --cy-14: #3A3527;
+    --cy-16: #3A3527;
+    --cy-18: #3A3527;
+    --cy-22: #3A3527;
+    --cy-8: #2E2A1F;
+    --danger: #E1998A;
+    --dg-10: rgba(225,153,138,0.1);
+    --dg-40: rgba(225,153,138,0.4);
+    --gd-10: rgba(123,190,147,0.1);
+    --gd-40: rgba(123,190,147,0.4);
+    --gl-10: transparent;
+    --gl-35: transparent;
+    --gl-5: transparent;
+    --gl-6: transparent;
+    --gl-9: transparent;
+    --good: #7BBE93;
+    --hi-90: transparent;
+    --ink: #F1ECE1;
+    --ink-bright: #EDE6D8;
+    --ink-dim: #7D7563;
+    --ink-faint: #7D7563;
+    --ink-soft: #B3A992;
+    --surface: #221F17;
+    --tool-ink: #C9A468;
+    --warn: #FFB454;
+    --wn-25: rgba(221,162,93,0.25);
+    --wn-8: rgba(221,162,93,0.08);
+      color-scheme: dark;
+    }
+  }
+  [data-look="modern"][data-theme="dark"] {
+    --ac-10: rgba(221,162,93,0.1);
+    --ac-15: rgba(221,162,93,0.15);
+    --ac-18: rgba(221,162,93,0.18);
+    --ac-28: rgba(221,162,93,0.28);
+    --ac-35: rgba(221,162,93,0.35);
+    --ac-40: rgba(221,162,93,0.4);
+    --ac-45: rgba(221,162,93,0.45);
+    --ac-50: rgba(221,162,93,0.5);
+    --ac-6: rgba(221,162,93,0.06);
+    --ac-60: rgba(221,162,93,0.6);
+    --ac-8: rgba(221,162,93,0.08);
+    --ac-85: rgba(221,162,93,0.85);
+    --accent: #DDA25D;
+    --accent-hover: #EAB776;
+    --accent-ink: #211705;
+    --bg: #19170F;
+    --cy-10: #2E2A1F;
+    --cy-12: #2E2A1F;
+    --cy-14: #3A3527;
+    --cy-16: #3A3527;
+    --cy-18: #3A3527;
+    --cy-22: #3A3527;
+    --cy-8: #2E2A1F;
+    --danger: #E1998A;
+    --dg-10: rgba(225,153,138,0.1);
+    --dg-40: rgba(225,153,138,0.4);
+    --gd-10: rgba(123,190,147,0.1);
+    --gd-40: rgba(123,190,147,0.4);
+    --gl-10: transparent;
+    --gl-35: transparent;
+    --gl-5: transparent;
+    --gl-6: transparent;
+    --gl-9: transparent;
+    --good: #7BBE93;
+    --hi-90: transparent;
+    --ink: #F1ECE1;
+    --ink-bright: #EDE6D8;
+    --ink-dim: #7D7563;
+    --ink-faint: #7D7563;
+    --ink-soft: #B3A992;
+    --surface: #221F17;
+    --tool-ink: #C9A468;
+    --warn: #FFB454;
+    --wn-25: rgba(221,162,93,0.25);
+    --wn-8: rgba(221,162,93,0.08);
+    color-scheme: dark;
+  }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; }
-  body { font-family: 'Sora', system-ui, sans-serif; color: #E8EEF4; background: #05070b; }
+  body { font-family: var(--font-ui); color: var(--ink); background: var(--bg); }
   .drag { -webkit-app-region: drag; }
   .no-drag { -webkit-app-region: no-drag; }
 
   input[type=text], input[type=password], input[type=number], select {
-    font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #D7E2EA;
-    background: #0A0F16; border: 1px solid rgba(120,190,255,0.16); padding: 9px 12px;
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-bright);
+    background: var(--surface); border: 1px solid var(--cy-16); padding: 9px 12px;
     border-radius: 6px; outline: none; width: 100%;
   }
-  input:focus, select:focus { border-color: rgba(111,227,255,0.5); }
+  input:focus, select:focus { border-color: var(--ac-50); }
   input[type=range] {
     -webkit-appearance: none; width: 100%; height: 4px; border-radius: 2px;
-    background: rgba(120,190,255,0.14); outline: none;
+    background: var(--cy-14); outline: none;
   }
   input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
-    background: #EAF6FC; box-shadow: 0 0 10px rgba(111,227,255,0.6); cursor: pointer;
+    background: var(--ink); box-shadow: 0 0 10px var(--ac-60); cursor: pointer;
   }
   .toggle { width: 38px; height: 22px; border-radius: 12px; position: relative; cursor: pointer; transition: background 0.15s ease; }
-  .toggle.on { background: oklch(78% 0.14 200); box-shadow: 0 0 10px rgba(111,227,255,0.35); }
-  .toggle.off { background: rgba(120,190,255,0.16); }
-  .toggle .knob { position: absolute; top: 2px; width: 18px; height: 18px; border-radius: 50%; background: #04141C; transition: left 0.15s ease; }
-  .toggle.on .knob { left: 18px; background: #04141C; }
-  .toggle.off .knob { left: 2px; background: #7C93A6; }
+  .toggle.on { background: var(--accent); box-shadow: 0 0 10px var(--ac-35); }
+  .toggle.off { background: var(--cy-16); }
+  .toggle .knob { position: absolute; top: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--accent-ink); transition: left 0.15s ease; }
+  .toggle.on .knob { left: 18px; background: var(--accent-ink); }
+  .toggle.off .knob { left: 2px; background: var(--ink-soft); }
 
   #save-btn { cursor: pointer; transition: filter 0.15s ease; }
   #save-btn:hover { filter: brightness(1.08); }
-  #save-status { font-size: 11px; color: #56677A; text-align: center; margin-top: 8px; height: 14px; }
+  #save-status { font-size: 11px; color: var(--ink-faint); text-align: center; margin-top: 8px; height: 14px; }
 
-  .mini-btn { padding: 7px 12px; border-radius: 7px; border: 1px solid rgba(120,190,255,0.22); font-size: 11.5px; color: #D7E2EA; cursor: pointer; white-space: nowrap; transition: all 0.15s ease; }
-  .mini-btn:hover { border-color: rgba(111,227,255,0.5); color: #EAF6FC; }
-  .mini-btn.accent { background: oklch(78% 0.14 200); color: #04141C; border-color: transparent; font-weight: 600; }
-  .provider-option { color: #8CA0B3; transition: all 0.15s ease; }
-  .provider-option.selected { border-color: rgba(111,227,255,0.6) !important; color: #EAF6FC; background: rgba(111,227,255,0.08); box-shadow: 0 0 14px rgba(111,227,255,0.15); }
-  .preset-btn:hover { border-color: rgba(111,227,255,0.5) !important; color: #EAF6FC !important; }
+  .mini-btn { padding: 7px 12px; border-radius: 7px; border: 1px solid var(--cy-22); font-size: 11.5px; color: var(--ink-bright); cursor: pointer; white-space: nowrap; transition: all 0.15s ease; }
+  .mini-btn:hover { border-color: var(--ac-50); color: var(--ink); }
+  .mini-btn.accent { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+  .provider-option { color: var(--ink-soft); transition: all 0.15s ease; }
+  .provider-option.selected { border-color: var(--ac-60) !important; color: var(--ink); background: var(--ac-8); box-shadow: 0 0 14px var(--ac-15); }
+  .preset-btn:hover { border-color: var(--ac-50) !important; color: var(--ink) !important; }
 </style>
 </head>
 <body>
 
 <div style="width:100%; height:100%; display:flex; flex-direction:column; position:relative;">
-  <div style="position:absolute; inset:0; pointer-events:none; background: radial-gradient(420px 280px at 90% -10%, rgba(79,166,255,0.09), transparent 60%);"></div>
+  <div style="position:absolute; inset:0; pointer-events:none; background: radial-gradient(420px 280px at 90% -10%, var(--gl-9), transparent 60%);"></div>
 
-  <div class="drag pywebview-drag-region" style="position:relative; height:52px; min-height:52px; display:flex; align-items:center; justify-content:space-between; padding:0 18px; border-bottom:1px solid rgba(120,190,255,0.12);">
+  <div class="drag pywebview-drag-region" style="position:relative; height:52px; min-height:52px; display:flex; align-items:center; justify-content:space-between; padding:0 18px; border-bottom:1px solid var(--cy-12);">
     <div style="font-size:13px; font-weight:600; letter-spacing:0.14em;">SETTINGS</div>
-    <svg id="close-btn" class="no-drag" data-tip="Close settings" width="14" height="14" viewBox="0 0 24 24" fill="none" style="opacity:0.6; cursor:pointer;"><path d="M6 6l12 12M18 6L6 18" stroke="#8CA0B3" stroke-width="1.6" stroke-linecap="round"/></svg>
+    <svg id="close-btn" class="no-drag" data-tip="Close settings" width="14" height="14" viewBox="0 0 24 24" fill="none" style="opacity:0.6; cursor:pointer;"><path d="M6 6l12 12M18 6L6 18" stroke="var(--ink-soft)" stroke-width="1.6" stroke-linecap="round"/></svg>
   </div>
 
   <div style="position:relative; flex:1; overflow-y:auto; padding:26px 30px; display:flex; flex-direction:column; gap:26px;">
 
     <div>
-      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">AI PROVIDER</div>
+      <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--ink-faint); margin-bottom:14px;">APPEARANCE</div>
 
+      <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px;">INTERFACE STYLE</div>
       <div style="display:flex; gap:10px; margin-bottom:14px;">
-        <div id="provider-anthropic" class="provider-option" data-tip="Use Anthropic's Claude models" style="flex:1; text-align:center; padding:10px; border-radius:8px; border:1px solid rgba(120,190,255,0.16); cursor:pointer; font-size:12.5px;">Claude</div>
-        <div id="provider-openai" class="provider-option" data-tip="Use OpenAI, or any OpenAI-compatible service such as Groq, Together or a local Ollama" style="flex:1; text-align:center; padding:10px; border-radius:8px; border:1px solid rgba(120,190,255,0.16); cursor:pointer; font-size:12.5px;">OpenAI / Compatible</div>
+        <div id="look-classic" class="provider-option selected" data-tip="The original look" style="flex:1; text-align:center; padding:10px; border-radius:8px; border:1px solid var(--cy-16); cursor:pointer; font-size:12.5px;">Classic</div>
+        <div id="look-modern" class="provider-option" data-tip="A warmer, more spacious look, with a light or dark theme" style="flex:1; text-align:center; padding:10px; border-radius:8px; border:1px solid var(--cy-16); cursor:pointer; font-size:12.5px;">Modern</div>
       </div>
 
-      <div style="font-size:11px; color:#56677A; margin-bottom:6px;">MODEL</div>
+      <div id="theme-row" style="display:none;">
+        <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px;">THEME</div>
+        <div style="display:flex; gap:10px;">
+          <div id="theme-light" class="provider-option" style="flex:1; text-align:center; padding:9px; border-radius:8px; border:1px solid var(--cy-16); cursor:pointer; font-size:12px;">Light</div>
+          <div id="theme-dark" class="provider-option" style="flex:1; text-align:center; padding:9px; border-radius:8px; border:1px solid var(--cy-16); cursor:pointer; font-size:12px;">Dark</div>
+          <div id="theme-system" class="provider-option selected" style="flex:1; text-align:center; padding:9px; border-radius:8px; border:1px solid var(--cy-16); cursor:pointer; font-size:12px;">System</div>
+        </div>
+        <div style="font-size:11px; color:var(--ink-dim); margin-top:6px;">"System" follows Windows' light/dark setting. Applies immediately, in this window and the main one.</div>
+      </div>
+    </div>
+
+    <div style="height:1px; background:var(--cy-10);"></div>
+
+    <div>
+      <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--ink-faint); margin-bottom:14px;">AI PROVIDER</div>
+
+      <div style="display:flex; gap:10px; margin-bottom:14px;">
+        <div id="provider-anthropic" class="provider-option" data-tip="Use Anthropic's Claude models" style="flex:1; text-align:center; padding:10px; border-radius:8px; border:1px solid var(--cy-16); cursor:pointer; font-size:12.5px;">Claude</div>
+        <div id="provider-openai" class="provider-option" data-tip="Use OpenAI, or any OpenAI-compatible service such as Groq, Together or a local Ollama" style="flex:1; text-align:center; padding:10px; border-radius:8px; border:1px solid var(--cy-16); cursor:pointer; font-size:12.5px;">OpenAI / Compatible</div>
+      </div>
+
+      <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px;">MODEL</div>
       <input id="model" type="text" placeholder="claude-opus-4-5-20251101">
 
       <div id="base-url-row" style="margin-top:14px; display:none;">
-        <div style="font-size:11px; color:#56677A; margin-bottom:6px;">BASE URL (optional)</div>
+        <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px;">BASE URL (optional)</div>
         <input id="base-url" type="text" placeholder="Leave blank for api.openai.com">
-        <div style="font-size:11px; color:#4A5A6A; margin-top:6px; margin-bottom:10px;">Set this to use any OpenAI-compatible endpoint instead. Quick fill (still update the API key to match) &mdash; providers rename/retire models over time, so if the filled-in model 404s, check that provider's current model list:</div>
+        <div style="font-size:11px; color:var(--ink-dim); margin-top:6px; margin-bottom:10px;">Set this to use any OpenAI-compatible endpoint instead. Quick fill (still update the API key to match) &mdash; providers rename/retire models over time, so if the filled-in model 404s, check that provider's current model list:</div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <div class="preset-btn" data-tip="Fill in this provider's web address and an example model" data-url="" data-model="gpt-4o" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">OpenAI</div>
-          <div class="preset-btn" data-tip="Fill in this provider's web address and an example model" data-url="https://api.groq.com/openai/v1" data-model="openai/gpt-oss-120b" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">Groq</div>
-          <div class="preset-btn" data-tip="Fill in this provider's web address and an example model" data-url="https://api.together.xyz/v1" data-model="meta-llama/Llama-3.3-70B-Instruct-Turbo" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">Together</div>
-          <div class="preset-btn" data-tip="Fill in this provider's web address and an example model" data-url="https://openrouter.ai/api/v1" data-model="openai/gpt-4o" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">OpenRouter</div>
-          <div class="preset-btn" data-tip="Fill in this provider's web address and an example model" data-url="http://localhost:11434/v1" data-model="llama3.3" style="padding:6px 10px; border-radius:6px; border:1px solid rgba(120,190,255,0.16); font-size:11px; color:#8CA0B3; cursor:pointer;">Local Ollama</div>
+          <div class="preset-btn" data-tip="Fill in this provider's web address and an example model" data-url="" data-model="gpt-4o" style="padding:6px 10px; border-radius:6px; border:1px solid var(--cy-16); font-size:11px; color:var(--ink-soft); cursor:pointer;">OpenAI</div>
+          <div class="preset-btn" data-tip="Fill in this provider's web address and an example model" data-url="https://api.groq.com/openai/v1" data-model="openai/gpt-oss-120b" style="padding:6px 10px; border-radius:6px; border:1px solid var(--cy-16); font-size:11px; color:var(--ink-soft); cursor:pointer;">Groq</div>
+          <div class="preset-btn" data-tip="Fill in this provider's web address and an example model" data-url="https://api.together.xyz/v1" data-model="meta-llama/Llama-3.3-70B-Instruct-Turbo" style="padding:6px 10px; border-radius:6px; border:1px solid var(--cy-16); font-size:11px; color:var(--ink-soft); cursor:pointer;">Together</div>
+          <div class="preset-btn" data-tip="Fill in this provider's web address and an example model" data-url="https://openrouter.ai/api/v1" data-model="openai/gpt-4o" style="padding:6px 10px; border-radius:6px; border:1px solid var(--cy-16); font-size:11px; color:var(--ink-soft); cursor:pointer;">OpenRouter</div>
+          <div class="preset-btn" data-tip="Fill in this provider's web address and an example model" data-url="http://localhost:11434/v1" data-model="llama3.3" style="padding:6px 10px; border-radius:6px; border:1px solid var(--cy-16); font-size:11px; color:var(--ink-soft); cursor:pointer;">Local Ollama</div>
         </div>
       </div>
 
-      <div style="font-size:11px; color:#56677A; margin-bottom:6px; margin-top:14px;">API KEY</div>
+      <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px; margin-top:14px;">API KEY</div>
       <input id="api-key" type="password" placeholder="sk-...">
       <div id="key-status" style="font-size:11px; margin-top:10px;"></div>
     </div>
 
-    <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
+    <div style="height:1px; background:var(--cy-10);"></div>
 
     <div>
-      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:10px;">BACKUP AI (OPTIONAL)</div>
-      <div style="font-size:11px; color:#4A5A6A; margin-bottom:14px;">If the AI above is rate-limited, out of quota or offline, Jarvis answers with a backup instead of failing, and goes back to the main one when it recovers. Tip: Groq limits each model separately, so a smaller Groq model with the same key is a free backup.</div>
+      <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--ink-faint); margin-bottom:10px;">BACKUP AI (OPTIONAL)</div>
+      <div style="font-size:11px; color:var(--ink-dim); margin-bottom:14px;">If the AI above is rate-limited, out of quota or offline, Jarvis answers with a backup instead of failing, and goes back to the main one when it recovers. Tip: Groq limits each model separately, so a smaller Groq model with the same key is a free backup.</div>
       <div id="backup-slots" style="display:flex; flex-direction:column; gap:16px;"></div>
     </div>
 
-    <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
+    <div style="height:1px; background:var(--cy-10);"></div>
 
     <div>
-      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">YOUR DATA</div>
-      <div style="font-size:11px; color:#4A5A6A; margin-bottom:10px;">Jarvis keeps your conversations, remembered facts, reminders and the documents it creates in this folder. Your API key and settings stay in AppData, not here.</div>
+      <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--ink-faint); margin-bottom:14px;">YOUR DATA</div>
+      <div style="font-size:11px; color:var(--ink-dim); margin-bottom:10px;">Jarvis keeps your conversations, remembered facts, reminders and the documents it creates in this folder. Your API key and settings stay in AppData, not here.</div>
       <input id="data-path" type="text" readonly data-tip="The folder Jarvis is using now">
-      <div id="data-summary" style="font-size:11px; color:#56677A; margin-top:6px;"></div>
+      <div id="data-summary" style="font-size:11px; color:var(--ink-faint); margin-top:6px;"></div>
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
         <div id="data-change" class="mini-btn" data-tip="Pick another folder. Windows' folder picker has a Make New Folder button">Change folder&hellip;</div>
         <div id="data-rename" class="mini-btn" data-tip="Give the current folder a different name">Rename&hellip;</div>
@@ -110,58 +333,58 @@
         <input id="data-new-name" type="text" placeholder="New folder name" style="flex:1;">
         <div id="data-rename-go" class="mini-btn accent">Rename</div>
       </div>
-      <div id="data-status" style="font-size:11px; margin-top:10px; color:#56677A;"></div>
+      <div id="data-status" style="font-size:11px; margin-top:10px; color:var(--ink-faint);"></div>
       <div id="data-restart" class="mini-btn accent" style="display:none; margin-top:10px;" data-tip="Restarts Jarvis and moves your data into the folder above">Restart now to move it</div>
     </div>
 
-    <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
+    <div style="height:1px; background:var(--cy-10);"></div>
 
     <div>
-      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">MICROPHONE &amp; SPEAKER</div>
+      <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--ink-faint); margin-bottom:14px;">MICROPHONE &amp; SPEAKER</div>
       <div style="display:flex; align-items:center; justify-content:space-between;">
-        <div style="font-size:11px; color:#4A5A6A; max-width:340px;">Confirms both actually work, right now -- no need to go check Windows' Privacy &amp; security settings yourself.</div>
-        <div id="test-audio-btn" data-tip="Listens briefly to your microphone, then speaks a phrase, to confirm both work" style="flex-shrink:0; text-align:center; padding:9px 16px; border-radius:8px; border:1px solid rgba(120,190,255,0.22); font-size:12px; color:#D7E2EA; cursor:pointer; white-space:nowrap;">Test Mic &amp; Speaker</div>
+        <div style="font-size:11px; color:var(--ink-dim); max-width:340px;">Confirms both actually work, right now -- no need to go check Windows' Privacy &amp; security settings yourself.</div>
+        <div id="test-audio-btn" data-tip="Listens briefly to your microphone, then speaks a phrase, to confirm both work" style="flex-shrink:0; text-align:center; padding:9px 16px; border-radius:8px; border:1px solid var(--cy-22); font-size:12px; color:var(--ink-bright); cursor:pointer; white-space:nowrap;">Test Mic &amp; Speaker</div>
       </div>
       <div id="test-audio-status" style="font-size:11px; margin-top:10px;"></div>
       <div style="margin-top:18px;">
-        <div style="font-size:11px; color:#56677A; margin-bottom:6px;">MICROPHONE</div>
+        <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px;">MICROPHONE</div>
         <select id="input-device"><option value="">System default</option></select>
-        <div style="font-size:11px; color:#4A5A6A; margin-top:6px;">Using a Bluetooth headset? Windows drops it to low-quality mono "call" mode whenever its own mic is in use, and Jarvis listens for the wake word continuously. For best sound, pick your PC/USB microphone here and keep the headset for output only (Output Device below). Requires a restart to apply.</div>
+        <div style="font-size:11px; color:var(--ink-dim); margin-top:6px;">Using a Bluetooth headset? Windows drops it to low-quality mono "call" mode whenever its own mic is in use, and Jarvis listens for the wake word continuously. For best sound, pick your PC/USB microphone here and keep the headset for output only (Output Device below). Requires a restart to apply.</div>
       </div>
       <div style="margin-top:18px;">
-        <div style="font-size:11px; color:#56677A; margin-bottom:6px;">SPEECH LANGUAGE (WHAT YOU SPEAK)</div>
+        <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px;">SPEECH LANGUAGE (WHAT YOU SPEAK)</div>
         <select id="stt-language" data-tip="The language Jarvis should expect when you talk to it">
           <option value="en">English</option>
           <option value="hi">Hindi</option>
           <option value="bn">Bengali</option>
           <option value="auto">Auto-detect (less reliable)</option>
         </select>
-        <div style="font-size:11px; color:#4A5A6A; margin-top:6px;">Applies immediately. The wake phrase stays "Hey Jarvis". A fixed language is much more reliable than auto-detect, which often mistakes Bengali for Hindi.</div>
+        <div style="font-size:11px; color:var(--ink-dim); margin-top:6px;">Applies immediately. The wake phrase stays "Hey Jarvis". A fixed language is much more reliable than auto-detect, which often mistakes Bengali for Hindi.</div>
       </div>
       <div style="margin-top:18px;">
-        <div style="font-size:11px; color:#56677A; margin-bottom:6px;">SPEECH RECOGNITION</div>
+        <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px;">SPEECH RECOGNITION</div>
         <select id="stt-engine" data-tip="Where your voice is turned into text">
           <option value="local">On this PC (private, works offline)</option>
           <option value="cloud">Cloud, via your AI provider (more accurate)</option>
         </select>
-        <div id="stt-status" style="font-size:11px; color:#4A5A6A; margin-top:6px;"></div>
+        <div id="stt-status" style="font-size:11px; color:var(--ink-dim); margin-top:6px;"></div>
       </div>
     </div>
 
-    <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
+    <div style="height:1px; background:var(--cy-10);"></div>
 
     <div>
-      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">WAKE WORD</div>
+      <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--ink-faint); margin-bottom:14px;">WAKE WORD</div>
       <div>
         <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-          <div style="font-size:13px; color:#D7E2EA;">Sensitivity threshold</div>
-          <div id="threshold-value" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6FE3FF;">0.50</div>
+          <div style="font-size:13px; color:var(--ink-bright);">Sensitivity threshold</div>
+          <div id="threshold-value" style="font-family:var(--font-mono); font-size:12px; color:var(--accent);">0.50</div>
         </div>
         <input id="threshold" data-tip="Left: reacts to quieter or less clear speech (more false triggers). Right: stricter" type="range" min="0.1" max="0.9" step="0.05" value="0.5">
-        <div style="display:flex; justify-content:space-between; margin-top:6px; font-family:'JetBrains Mono',monospace; font-size:9.5px; color:#4A5A6A;"><span>MORE SENSITIVE</span><span>FEWER FALSE TRIGGERS</span></div>
+        <div style="display:flex; justify-content:space-between; margin-top:6px; font-family:var(--font-mono); font-size:9.5px; color:var(--ink-dim);"><span>MORE SENSITIVE</span><span>FEWER FALSE TRIGGERS</span></div>
       </div>
       <div style="margin-top:18px;">
-        <div style="font-size:11px; color:#56677A; margin-bottom:6px;">FOLLOW-UP LISTENING</div>
+        <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px;">FOLLOW-UP LISTENING</div>
         <select id="follow-up" data-tip="After Jarvis answers, it keeps listening for this long without needing the wake word">
           <option value="0">Off (say "Hey Jarvis" every time)</option>
           <option value="4">4 seconds</option>
@@ -169,53 +392,53 @@
           <option value="10">10 seconds</option>
           <option value="15">15 seconds</option>
         </select>
-        <div style="font-size:11px; color:#4A5A6A; margin-top:6px;">After an answer, keep talking without saying the wake word. Say "thanks" or "that's all" to end it early. Also lets you reply "yes" to a confirmation question. Requires a restart to apply.</div>
+        <div style="font-size:11px; color:var(--ink-dim); margin-top:6px;">After an answer, keep talking without saying the wake word. Say "thanks" or "that's all" to end it early. Also lets you reply "yes" to a confirmation question. Requires a restart to apply.</div>
       </div>
       <div style="margin-top:18px; display:flex; justify-content:space-between; align-items:center; gap:16px;">
         <div>
-          <div style="font-size:13px; color:#D7E2EA;">Ask before risky actions</div>
-          <div style="font-size:11px; color:#56677A; margin-top:2px;">Jarvis asks "Do you want me to...?" and waits for a yes before closing an app or window, or locking the PC.</div>
+          <div style="font-size:13px; color:var(--ink-bright);">Ask before risky actions</div>
+          <div style="font-size:11px; color:var(--ink-faint); margin-top:2px;">Jarvis asks "Do you want me to...?" and waits for a yes before closing an app or window, or locking the PC.</div>
         </div>
         <div id="confirm-toggle" class="toggle on" data-tip="Turn confirmation questions on or off"><div class="knob"></div></div>
       </div>
     </div>
 
-    <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
+    <div style="height:1px; background:var(--cy-10);"></div>
 
     <div>
-      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">VOICE</div>
+      <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--ink-faint); margin-bottom:14px;">VOICE</div>
       <div style="display:flex; gap:24px;">
         <div style="flex:1;">
           <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-            <div style="font-size:13px; color:#D7E2EA;">Speaking rate</div>
-            <div id="rate-value" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6FE3FF;">185 wpm</div>
+            <div style="font-size:13px; color:var(--ink-bright);">Speaking rate</div>
+            <div id="rate-value" style="font-family:var(--font-mono); font-size:12px; color:var(--accent);">185 wpm</div>
           </div>
           <input id="rate" data-tip="How fast Jarvis speaks, in words per minute" type="range" min="120" max="260" step="5" value="185">
         </div>
         <div style="flex:1;">
           <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-            <div style="font-size:13px; color:#D7E2EA;">Volume</div>
-            <div id="volume-value" style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#6FE3FF;">100%</div>
+            <div style="font-size:13px; color:var(--ink-bright);">Volume</div>
+            <div id="volume-value" style="font-family:var(--font-mono); font-size:12px; color:var(--accent);">100%</div>
           </div>
           <input id="volume" data-tip="How loud Jarvis speaks" type="range" min="0" max="100" step="5" value="100">
         </div>
       </div>
       <div style="margin-top:18px;">
-        <div style="font-size:11px; color:#56677A; margin-bottom:6px;">OUTPUT DEVICE</div>
+        <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px;">OUTPUT DEVICE</div>
         <select id="output-device"><option value="">System default</option></select>
-        <div style="font-size:11px; color:#4A5A6A; margin-top:6px;">Pin Jarvis's own speech to this device, regardless of what Windows currently calls the default -- fixes speech silently going nowhere when a paired Bluetooth headset stays "default" while turned off. Requires a restart to apply.</div>
+        <div style="font-size:11px; color:var(--ink-dim); margin-top:6px;">Pin Jarvis's own speech to this device, regardless of what Windows currently calls the default -- fixes speech silently going nowhere when a paired Bluetooth headset stays "default" while turned off. Requires a restart to apply.</div>
       </div>
       <div style="margin-top:18px;">
-        <div style="font-size:11px; color:#56677A; margin-bottom:6px;">VOICE ENGINE</div>
+        <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px;">VOICE ENGINE</div>
         <select id="tts-engine">
           <option value="auto">Auto (Windows voices; online neural voice for Hindi/Bengali)</option>
           <option value="sapi">Windows voices only (fully offline)</option>
           <option value="edge">Online neural voices for everything</option>
         </select>
-        <div style="font-size:11px; color:#4A5A6A; margin-top:6px;">The online voices are Microsoft's neural voices (no account or key needed) and require internet. If they're unreachable, Jarvis falls back to an installed Windows voice. Requires a restart to apply.</div>
+        <div style="font-size:11px; color:var(--ink-dim); margin-top:6px;">The online voices are Microsoft's neural voices (no account or key needed) and require internet. If they're unreachable, Jarvis falls back to an installed Windows voice. Requires a restart to apply.</div>
       </div>
       <div style="margin-top:18px;">
-        <div style="font-size:11px; color:#56677A; margin-bottom:6px;">OUTPUT LANGUAGE</div>
+        <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px;">OUTPUT LANGUAGE</div>
         <select id="reply-language">
           <option value="">Same as input (default)</option>
           <option value="english">English</option>
@@ -226,35 +449,35 @@
       </div>
     </div>
 
-    <div style="height:1px; background:rgba(120,190,255,0.10);"></div>
+    <div style="height:1px; background:var(--cy-10);"></div>
 
     <div>
-      <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.14em; color:#56677A; margin-bottom:14px;">REMOTE ACCESS</div>
+      <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:0.14em; color:var(--ink-faint); margin-bottom:14px;">REMOTE ACCESS</div>
 
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
         <div>
-          <div style="font-size:13px; color:#D7E2EA;">Local API server</div>
-          <div style="font-size:11px; color:#56677A; margin-top:2px;">Lets the iOS app reach this assistant</div>
+          <div style="font-size:13px; color:var(--ink-bright);">Local API server</div>
+          <div style="font-size:11px; color:var(--ink-faint); margin-top:2px;">Lets the iOS app reach this assistant</div>
         </div>
         <div id="server-toggle" class="toggle on" data-tip="Turns the remote API on or off. It lets the phone app reach this assistant"><div class="knob"></div></div>
       </div>
 
       <div style="display:flex; gap:16px;">
         <div style="flex:1;">
-          <div style="font-size:11px; color:#56677A; margin-bottom:6px;">PORT</div>
+          <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px;">PORT</div>
           <input id="port" type="number" value="8731">
         </div>
         <div style="flex:2;">
-          <div style="font-size:11px; color:#56677A; margin-bottom:6px;">API TOKEN</div>
+          <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px;">API TOKEN</div>
           <input id="token" type="password" value="">
         </div>
       </div>
-      <div style="font-size:11px; color:#4A5A6A; margin-top:10px;">Changing the token here updates .env — restart Jarvis afterward for the local API server to pick it up.</div>
+      <div style="font-size:11px; color:var(--ink-dim); margin-top:10px;">Changing the token here updates .env — restart Jarvis afterward for the local API server to pick it up.</div>
     </div>
   </div>
 
   <div style="position:relative; padding:16px 30px 22px;">
-    <div id="save-btn" data-tip="Save all changes" style="text-align:center; padding:12px; border-radius:10px; background:oklch(78% 0.14 200); color:#04141C; font-weight:600; font-size:14px; box-shadow:0 0 22px rgba(111,227,255,0.35);">Save</div>
+    <div id="save-btn" data-tip="Save all changes" style="text-align:center; padding:12px; border-radius:10px; background:var(--accent); color:var(--accent-ink); font-weight:600; font-size:14px; box-shadow:0 0 22px var(--ac-35);">Save</div>
     <div id="save-status"></div>
   </div>
 </div>
@@ -270,6 +493,29 @@
   });
 
   const $ = (id) => document.getElementById(id);
+
+  // ---- appearance (look + theme) -- applied locally the instant it's clicked, saved with the rest
+  let uiLook = 'classic';
+  let uiTheme = 'system';
+
+  function applyLookLocally(look) {
+    document.documentElement.dataset.look = look;
+    $('look-classic').className = 'provider-option' + (look === 'classic' ? ' selected' : '');
+    $('look-modern').className = 'provider-option' + (look === 'modern' ? ' selected' : '');
+    $('theme-row').style.display = look === 'modern' ? 'block' : 'none';
+  }
+  function applyThemeLocally(theme) {
+    if (theme === 'system') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.dataset.theme = theme;
+    ['light', 'dark', 'system'].forEach((t) => {
+      $('theme-' + t).className = 'provider-option' + (t === theme ? ' selected' : '');
+    });
+  }
+  $('look-classic').addEventListener('click', () => { uiLook = 'classic'; applyLookLocally(uiLook); });
+  $('look-modern').addEventListener('click', () => { uiLook = 'modern'; applyLookLocally(uiLook); });
+  $('theme-light').addEventListener('click', () => { uiTheme = 'light'; applyThemeLocally(uiTheme); });
+  $('theme-dark').addEventListener('click', () => { uiTheme = 'dark'; applyThemeLocally(uiTheme); });
+  $('theme-system').addEventListener('click', () => { uiTheme = 'system'; applyThemeLocally(uiTheme); });
 
   function bindRange(id, valueId, format) {
     $(id).addEventListener('input', () => { $(valueId).textContent = format($(id).value); });
@@ -318,7 +564,7 @@
     $('key-status').textContent = hasKey
       ? 'A key is set.'
       : `No key set yet — ${PROVIDER_DEFAULTS[provider].keyHint}, paste it here, then Save.`;
-    $('key-status').style.color = hasKey ? '#56677A' : '#FFB454';
+    $('key-status').style.color = hasKey ? 'var(--ink-faint)' : 'var(--warn)';
   }
 
   $('provider-anthropic').addEventListener('click', () => selectProvider('anthropic'));
@@ -327,19 +573,19 @@
 
   $('test-audio-btn').addEventListener('click', async () => {
     $('test-audio-status').textContent = 'Testing… (you should hear a short phrase spoken back)';
-    $('test-audio-status').style.color = '#56677A';
+    $('test-audio-status').style.color = 'var(--ink-faint)';
     try {
       const result = await window.pywebview.api.test_audio();
       if (result.ok) {
         $('test-audio-status').textContent = '✓ Microphone and speaker both confirmed working.';
-        $('test-audio-status').style.color = '#5AD696';
+        $('test-audio-status').style.color = 'var(--good)';
       } else {
         $('test-audio-status').textContent = result.message || 'Test failed.';
-        $('test-audio-status').style.color = '#E36B6B';
+        $('test-audio-status').style.color = 'var(--danger)';
       }
     } catch (e) {
       $('test-audio-status').textContent = 'Error running test: ' + e;
-      $('test-audio-status').style.color = '#E36B6B';
+      $('test-audio-status').style.color = 'var(--danger)';
     }
   });
 
@@ -347,26 +593,26 @@
     const lang = $('reply-language').value;
     if (!lang) {
       $('language-status').textContent = 'Jarvis answers in whatever language you speak or type in.';
-      $('language-status').style.color = '#4A5A6A';
+      $('language-status').style.color = 'var(--ink-dim)';
       return;
     }
     $('language-status').textContent = 'Checking for an installed voice…';
-    $('language-status').style.color = '#4A5A6A';
+    $('language-status').style.color = 'var(--ink-dim)';
     try {
       const ok = await window.pywebview.api.check_voice_for_language(lang);
       if (ok) {
         $('language-status').textContent = 'Replies will be answered and spoken in ' + $('reply-language').selectedOptions[0].textContent + '.';
-        $('language-status').style.color = '#56677A';
+        $('language-status').style.color = 'var(--ink-faint)';
       } else if ($('tts-engine').value === 'sapi') {
         $('language-status').textContent = `No ${$('reply-language').selectedOptions[0].textContent} voice is installed on this PC and "Windows voices only" is selected -- replies will be translated but won't be pronounced correctly. Switch Voice Engine to Auto, or install a voice via Windows Settings -> Time & Language -> Speech.`;
-        $('language-status').style.color = '#FFB454';
+        $('language-status').style.color = 'var(--warn)';
       } else {
         $('language-status').textContent = `Replies will be answered in ${$('reply-language').selectedOptions[0].textContent} and spoken with Microsoft's online neural voice (needs internet; no Windows voice needed).`;
-        $('language-status').style.color = '#56677A';
+        $('language-status').style.color = 'var(--ink-faint)';
       }
     } catch (e) {
       $('language-status').textContent = 'Could not check voice availability: ' + e;
-      $('language-status').style.color = '#E36B6B';
+      $('language-status').style.color = 'var(--danger)';
     }
   }
   $('reply-language').addEventListener('change', refreshLanguageStatus);
@@ -375,15 +621,15 @@
     const lang = $('stt-language').value;
     const cloud = $('stt-engine').value === 'cloud';
     const el = $('stt-status');
-    el.style.color = '#4A5A6A';
+    el.style.color = 'var(--ink-dim)';
     if (cloud && provider !== 'openai') {
       el.textContent = 'Cloud recognition needs an OpenAI-compatible AI provider such as Groq. Claude cannot transcribe speech, so Jarvis will use this PC instead.';
-      el.style.color = '#FFB454';
+      el.style.color = 'var(--warn)';
     } else if (cloud) {
       el.textContent = 'Each voice recording is uploaded to your AI provider (Groq or OpenAI) to be transcribed. If that fails, Jarvis falls back to this PC.';
     } else if (lang === 'bn') {
       el.textContent = 'Bengali is recognised poorly on this PC (it often writes Bengali in Devanagari letters). Cloud is strongly recommended for Bengali.';
-      el.style.color = '#FFB454';
+      el.style.color = 'var(--warn)';
     } else if (lang === 'hi' || lang === 'auto') {
       el.textContent = 'Hindi works on this PC but makes more mistakes than Cloud. Everything stays private and offline.';
     } else {
@@ -453,6 +699,10 @@
   async function loadSettings() {
     try {
       const s = await window.pywebview.api.get_settings();
+      uiLook = s.ui_look || 'classic';
+      uiTheme = s.ui_theme || 'system';
+      applyLookLocally(uiLook);
+      applyThemeLocally(uiTheme);
       $('threshold').value = s.wake_word_threshold;
       $('threshold-value').textContent = Number(s.wake_word_threshold).toFixed(2);
       $('rate').value = s.tts_rate;
@@ -495,6 +745,8 @@
     $('save-status').textContent = 'Saving…';
     try {
       const result = await window.pywebview.api.save_settings({
+        ui_look: uiLook,
+        ui_theme: uiTheme,
         wake_word_threshold: parseFloat($('threshold').value),
         tts_rate: parseInt($('rate').value, 10),
         tts_volume: parseInt($('volume').value, 10) / 100,
@@ -530,11 +782,11 @@
 
   function dataStatus(text, color) {
     $('data-status').textContent = text;
-    $('data-status').style.color = color || '#56677A';
+    $('data-status').style.color = color || 'var(--ink-faint)';
   }
 
   function showPending(path) {
-    dataStatus('Will move to ' + path + ' when Jarvis restarts. Nothing has moved yet.', '#FFB454');
+    dataStatus('Will move to ' + path + ' when Jarvis restarts. Nothing has moved yet.', 'var(--warn)');
     $('data-restart').style.display = 'inline-block';
   }
 
@@ -545,12 +797,12 @@
       $('data-summary').textContent = st.file_count + ' files, ' + fmtBytes(st.size_bytes) + '. Default location: ' + st.default_path;
       if (st.pending_path) showPending(st.pending_path);
     } catch (e) {
-      dataStatus('Could not read the data folder: ' + e, '#E36B6B');
+      dataStatus('Could not read the data folder: ' + e, 'var(--danger)');
     }
   }
 
   function handleChange(res) {
-    if (!res.ok) { dataStatus(res.message, '#E36B6B'); return; }
+    if (!res.ok) { dataStatus(res.message, 'var(--danger)'); return; }
     if (res.needs_restart) showPending(res.path);
     else dataStatus('That is already the current folder.');
   }
@@ -615,18 +867,18 @@
     const wrap = document.createElement('div');
     wrap.className = 'backup-slot';
     wrap.innerHTML = `
-      <div style="font-size:11px; color:#56677A; margin-bottom:6px;">BACKUP ${index + 1}</div>
+      <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px;">BACKUP ${index + 1}</div>
       <select class="bk-service">${Object.entries(BACKUP_PRESETS).map(([id, p]) => `<option value="${id}">${p.label}</option>`).join('')}</select>
       <div class="bk-fields" style="display:none; margin-top:10px;">
-        <div style="font-size:11px; color:#56677A; margin-bottom:6px;">MODEL</div>
+        <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px;">MODEL</div>
         <input class="bk-model" type="text">
         <div class="bk-url-row" style="margin-top:10px;">
-          <div style="font-size:11px; color:#56677A; margin-bottom:6px;">BASE URL</div>
+          <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px;">BASE URL</div>
           <input class="bk-url" type="text" placeholder="Leave blank for api.openai.com">
         </div>
-        <div style="font-size:11px; color:#56677A; margin-bottom:6px; margin-top:10px;">API KEY</div>
+        <div style="font-size:11px; color:var(--ink-faint); margin-bottom:6px; margin-top:10px;">API KEY</div>
         <input class="bk-key" type="password" placeholder="key">
-        <div class="bk-status" style="font-size:11px; margin-top:8px; color:#56677A;"></div>
+        <div class="bk-status" style="font-size:11px; margin-top:8px; color:var(--ink-faint);"></div>
       </div>`;
     const q = (c) => wrap.querySelector(c);
     const refresh = () => {
@@ -640,7 +892,7 @@
       q('.bk-key').previousElementSibling.style.display = needsKey ? 'block' : 'none';
       const missing = needsKey && !q('.bk-key').value;
       q('.bk-status').textContent = missing ? 'Paste ' + p.keyHint + ' to switch this backup on.' : '';
-      q('.bk-status').style.color = '#FFB454';
+      q('.bk-status').style.color = 'var(--warn)';
     };
     q('.bk-service').addEventListener('change', () => {
       const p = BACKUP_PRESETS[q('.bk-service').value];
